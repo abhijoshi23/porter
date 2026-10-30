@@ -1,0 +1,41 @@
+{
+  "name": "@abhijoshi23/porter-toolkit",
+  "version": "0.0.0",
+  "description": "Shared building blocks for Porter MCP servers: server factory, tool helper, resilient HTTP, caching, pagination, testing utilities.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abhijoshi23/porter.git",
+    "directory": "packages/toolkit"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "lru-cache": "11.5.3",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  }
+}
