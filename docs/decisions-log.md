@@ -2,12 +2,19 @@
 
 Short record of choices made along the way. Bigger, interview-worthy choices get an ADR in `docs/adr/`.
 
-| Date       | Decision                                                                                                                 | Why                                                                      |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| 2026-10-30 | Project name is **Porter** (not "Portage").                                                                              | Owner's choice.                                                          |
-| 2026-10-30 | GitHub `abhijoshi23`. npm packages are `@abhijoshi23/porter-*`, and registry names are `io.github.abhijoshi23/porter-*`. | GitHub auth on the MCP Registry requires the `io.github.<user>/` prefix. |
-| 2026-10-30 | **Zero cost** is a hard constraint.                                                                                      | Owner's requirement. See "Cost plan" below.                              |
-| 2026-10-30 | Proposals P1–P10 from `mcp-notes.md` are adopted by default.                                                             | No objection raised. Revisit if the owner disagrees.                     |
+| Date       | Decision                                                                                                                 | Why                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-30 | Project name is **Porter** (not "Portage").                                                                              | Owner's choice.                                                                                                              |
+| 2026-10-30 | GitHub `abhijoshi23`. npm packages are `@abhijoshi23/porter-*`, and registry names are `io.github.abhijoshi23/porter-*`. | GitHub auth on the MCP Registry requires the `io.github.<user>/` prefix.                                                     |
+| 2026-10-30 | **Zero cost** is a hard constraint.                                                                                      | Owner's requirement. See "Cost plan" below.                                                                                  |
+| 2026-10-30 | Proposals P1–P10 from `mcp-notes.md` are adopted by default.                                                             | No objection raised. Revisit if the owner disagrees.                                                                         |
+| 2026-10-30 | TypeScript pinned to 6.0.x (not 7).                                                                                      | typescript-eslint 8.x supports TS `<6.1`. Revisit when it supports TS 7.                                                     |
+| 2026-10-30 | Exact dependency versions (`save-exact`).                                                                                | Supply-chain hygiene. Dependabot proposes the bumps.                                                                         |
+| 2026-10-30 | Tool result text = summary + JSON in one text block, alongside `structuredContent`.                                      | Many clients only pass `content` to the model, and the spec says tools with an output schema SHOULD include serialized JSON. |
+| 2026-10-30 | Dropped `undici`; the HTTP client uses global `fetch` with an injectable `fetch`.                                        | Fixture record/replay injects `fetch` directly, which avoids mismatches between npm undici and Node's bundled undici.        |
+| 2026-10-30 | Modern-era tests drive `createMcpHandler(...).fetch` through the client's HTTP transport, with `legacy: 'reject'`.       | `InMemoryTransport` only speaks 2025. Rejecting legacy makes any silent fallback fail loudly.                                |
+| 2026-10-30 | HTTP mode refuses to start on a non-loopback bind without `PORTER_ALLOWED_HOSTS`.                                        | Failing closed against DNS rebinding.                                                                                        |
+| 2026-10-30 | `porter-hello` is `private` (never published).                                                                           | It is a reference only.                                                                                                      |
 
 ## Cost plan ($0)
 
