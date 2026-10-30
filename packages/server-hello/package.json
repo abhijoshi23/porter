@@ -1,0 +1,37 @@
+{
+  "name": "@abhijoshi23/porter-hello",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal Porter MCP server: a reference for wiring tools through the toolkit. Not published.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "porter-hello": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/bin.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector@2.13.0 node dist/bin.js"
+  },
+  "dependencies": {
+    "@abhijoshi23/porter-toolkit": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}
