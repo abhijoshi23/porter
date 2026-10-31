@@ -1,0 +1,44 @@
+{
+  "name": "@abhijoshi23/porter-opendata",
+  "version": "0.0.0",
+  "description": "MCP server for Canadian open data: Ontario, Toronto and federal CKAN catalogues plus Statistics Canada, with sandboxed SQL over CSVs.",
+  "license": "MIT",
+  "type": "module",
+  "mcpName": "io.github.abhijoshi23/porter-opendata",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abhijoshi23/porter.git",
+    "directory": "packages/server-opendata"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "porter-opendata": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/bin.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector@2.13.0 node dist/bin.js"
+  },
+  "dependencies": {
+    "@abhijoshi23/porter-toolkit": "workspace:*",
+    "@duckdb/node-api": "2.0.0-r.1",
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}

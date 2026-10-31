@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www150.statcan.gc.ca/t1/wds/rest/getSeriesInfoFromCubePidCoord"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "[{\"status\":\"SUCCESS\",\"object\":{\"responseStatusCode\":0,\"productId\":14100459,\"coordinate\":\"29.5.1.1.0.0.0.0.0.0\",\"vectorId\":1643279502,\"frequencyCode\":6,\"scalarFactorCode\":0,\"decimals\":1,\"terminated\":0,\"SeriesTitleEn\":\"Kitchener-Cambridge-Waterloo, Ontario;Unemployment rate;Estimate;Seasonally adjusted\",\"SeriesTitleFr\":\"Kitchener-Cambridge-Waterloo, Ontario;Taux de chômage;Estimation;Désaisonnalisées\",\"memberUomCode\":239}}]",
+    "encoding": "utf8"
+  }
+}
