@@ -200,6 +200,13 @@ export type MemberMatch =
  * That is the Waterloo (city) vs Waterloo (region) vs Kitchener-Cambridge-Waterloo (CMA) trap.
  */
 export function matchMember(members: readonly Member[], query: string): MemberMatch {
+  // Escape hatch when several members share a name (three CSDs all called "Waterloo"):
+  // error messages list "id:<n>", which the model can pass back verbatim.
+  const byId = /^\s*id:(\d+)\s*$/i.exec(query);
+  if (byId) {
+    const hit = members.find((m) => m.memberId === Number(byId[1]));
+    return hit ? { kind: 'exact', member: hit, similar: [] } : { kind: 'none' };
+  }
   const q = normalize(query);
   if (!q) return { kind: 'none' };
   const live = members.filter((m) => !m.terminated);
@@ -383,9 +390,10 @@ export class StatCanClient {
       (a, b) => a.dimensionPositionId - b.dimensionPositionId,
     )) {
       const key = normalize(dim.dimensionNameEn);
+      const geo = isGeographyDimension(dim);
       let wanted = remaining.get(key)?.value;
       remaining.delete(key);
-      if (wanted === undefined && isGeographyDimension(dim)) wanted = geography;
+      if (wanted === undefined && geo) wanted = geography;
 
       let chosen: Member | undefined;
       let how: string;
@@ -395,7 +403,7 @@ export class StatCanClient {
           throw new InvalidInputError(
             `"${wanted}" matches several ${dim.dimensionNameEn} options.`,
             {
-              hint: `Pick one exactly: ${listNames(m.candidates)}. (E.g. a city, its region and its census metropolitan area are different geographies.)`,
+              hint: `Pick one exactly (pass the name, or id:<n> for duplicates): ${listNames(m.candidates, 25, dim.member, geo)}. (E.g. a city, its region and its census metropolitan area are different geographies.)`,
             },
           );
         }
@@ -403,7 +411,7 @@ export class StatCanClient {
           throw new InvalidInputError(
             `"${wanted}" is not an option for "${dim.dimensionNameEn}" in this table.`,
             {
-              hint: `Options: ${listNames(dim.member)}.`,
+              hint: `Options: ${listNames(dim.member, 25, dim.member, geo)}.`,
             },
           );
         }
@@ -412,7 +420,7 @@ export class StatCanClient {
         if (m.similar.length) {
           // Surface near-misses so the model can tell the user, e.g. that the city was
           // used and not the metro area.
-          how += `; also available: ${listNames(m.similar, 5)}`;
+          how += `; also available: ${listNames(m.similar, 5, dim.member, geo)}`;
         }
       } else if (dim.member.length === 1) {
         chosen = dim.member[0];
@@ -424,12 +432,16 @@ export class StatCanClient {
           how = 'default';
         } else {
           throw new InvalidInputError(`Choose a value for "${dim.dimensionNameEn}".`, {
-            hint: `Pass members: { "${dim.dimensionNameEn}": "<one of: ${listNames(dim.member)}>" }${isGeographyDimension(dim) ? ' or use the geography argument' : ''}.`,
+            hint: `Pass members: { "${dim.dimensionNameEn}": "<one of: ${listNames(dim.member, 25, dim.member, geo)}>" }${geo ? ' or use the geography argument' : ''}.`,
           });
         }
       }
       ids.push(chosen!.memberId);
-      resolved.push({ dimension: dim.dimensionNameEn, member: chosen!.memberNameEn, how });
+      resolved.push({
+        dimension: dim.dimensionNameEn,
+        member: memberLabel(chosen!, dim.member, geo),
+        how,
+      });
     }
 
     if (remaining.size) {
@@ -523,8 +535,47 @@ export class StatCanClient {
   }
 }
 
-function listNames(members: readonly Member[], max = 25): string {
-  const names = members.slice(0, max).map((m) => `"${m.memberNameEn}"`);
+/**
+ * A member's display name with enough context to tell look-alikes apart, built from
+ * the table's own hierarchy:
+ *   city   → "Waterloo (in Waterloo, Ontario) [id:2868]"
+ *   region → "Waterloo (in Ontario; contains 7 sub-areas) [id:2864]"
+ * Ancestors already spelled out in the name ("Hamilton, Ontario") are not repeated, and
+ * "Canada" is omitted. Members whose names collide also get their id, so the model can
+ * select one exactly with id:<n>.
+ */
+export function memberLabel(m: Member, all: readonly Member[], geography = true): string {
+  const dupe = all.filter((x) => x.memberNameEn === m.memberNameEn).length > 1;
+  // Hierarchy context only helps for places; for other dimensions it's noise.
+  if (!geography) return dupe ? `${m.memberNameEn} [id:${m.memberId}]` : m.memberNameEn;
+  const byId = new Map(all.map((x) => [x.memberId, x]));
+  const ownParts = new Set(m.memberNameEn.split(',').slice(1).map(normalize));
+  const path: string[] = [];
+  let cur = m.parentMemberId ? byId.get(m.parentMemberId) : undefined;
+  while (cur && path.length < 3) {
+    const n = normalize(cur.memberNameEn);
+    if (n !== 'canada' && !ownParts.has(n)) path.push(cur.memberNameEn);
+    cur = cur.parentMemberId ? byId.get(cur.parentMemberId) : undefined;
+  }
+  const children = all.filter((x) => x.parentMemberId === m.memberId).length;
+  const context = [
+    path.length ? `in ${path.join(', ')}` : '',
+    children ? `contains ${children} sub-area${children === 1 ? '' : 's'}` : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+  let label = context ? `${m.memberNameEn} (${context})` : m.memberNameEn;
+  if (dupe) label += ` [id:${m.memberId}]`;
+  return label;
+}
+
+function listNames(
+  members: readonly Member[],
+  max = 25,
+  all: readonly Member[] = members,
+  geography = false,
+): string {
+  const names = members.slice(0, max).map((m) => `"${memberLabel(m, all, geography)}"`);
   return members.length > max
     ? `${names.join(', ')}, … (${members.length - max} more)`
     : names.join(', ');

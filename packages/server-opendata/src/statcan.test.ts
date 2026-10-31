@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   citation,
   matchMember,
+  memberLabel,
   normalize,
   parseProductId,
   StatCanClient,
@@ -11,10 +12,11 @@ import {
 } from './statcan.js';
 import { toRefDate } from './tools.js';
 
-const m = (memberId: number, memberNameEn: string, terminated = 0) => ({
+const m = (memberId: number, memberNameEn: string, terminated = 0, parentMemberId?: number) => ({
   memberId,
   memberNameEn,
   terminated,
+  parentMemberId,
 });
 
 describe('identifiers and citations', () => {
@@ -186,5 +188,65 @@ describe('toRefDate', () => {
     expect(toRefDate('2024-02', 'end')).toBe('2024-02-29');
     expect(toRefDate('2024-02-10', 'start')).toBe('2024-02-10');
     expect(() => toRefDate('last year', 'start')).toThrow(InvalidInputError);
+  });
+});
+
+describe('look-alike members (as in census table 98-10-0002)', () => {
+  // Real shape: several CSDs named exactly "Waterloo", told apart only by their parent.
+  const csds = [
+    m(1, 'Canada'),
+    m(24, 'Quebec', 0, 1),
+    m(35, 'Ontario', 0, 1),
+    m(12, 'Nova Scotia', 0, 1),
+    m(100, 'Waterloo', 0, 24),
+    m(200, 'Waterloo', 0, 35),
+    m(300, 'Waterloo', 0, 12),
+  ];
+
+  it('labels duplicates with their ancestry and id', () => {
+    expect(memberLabel(csds[5]!, csds)).toBe('Waterloo (in Ontario) [id:200]');
+    expect(memberLabel(csds[2]!, csds)).toBe('Ontario (contains 1 sub-area)'); // "Canada" is implied
+    expect(memberLabel(csds[5]!, csds, false)).toBe('Waterloo [id:200]'); // non-geography: no hierarchy
+  });
+
+  it('tells a city from the region of the same name', () => {
+    const geo = [
+      m(1, 'Canada'),
+      m(35, 'Ontario', 0, 1),
+      m(2864, 'Waterloo', 0, 35), // the region (census division)
+      m(2865, 'Kitchener', 0, 2864),
+      m(2868, 'Waterloo', 0, 2864), // the city
+      m(500, 'Hamilton, Ontario', 0, 35),
+    ];
+    expect(memberLabel(geo[2]!, geo)).toBe('Waterloo (in Ontario; contains 2 sub-areas) [id:2864]');
+    expect(memberLabel(geo[4]!, geo)).toBe('Waterloo (in Waterloo, Ontario) [id:2868]');
+    expect(memberLabel(geo[5]!, geo)).toBe('Hamilton, Ontario'); // province already in the name
+  });
+
+  it('reports the duplicates as ambiguous, then accepts id:<n>', () => {
+    expect(matchMember(csds, 'Waterloo').kind).toBe('ambiguous');
+    expect(matchMember(csds, 'id:200')).toMatchObject({ kind: 'exact', member: { memberId: 200 } });
+    expect(matchMember(csds, 'id:999').kind).toBe('none');
+  });
+
+  it('the ambiguity error tells the model exactly what to pass back', () => {
+    const client = new StatCanClient({} as never, {} as never);
+    const meta = {
+      productId: 98100002,
+      cubeTitleEn: 'Population and dwelling counts',
+      footnote: [],
+      dimension: [{ dimensionPositionId: 1, dimensionNameEn: 'Geography', member: csds }],
+    } as unknown as CubeMeta;
+    let hint = '';
+    try {
+      client.resolveCoordinate(meta, 'Waterloo', {});
+    } catch (e) {
+      hint = (e as InvalidInputError).hint ?? '';
+    }
+    expect(hint).toContain('"Waterloo (in Ontario) [id:200]"');
+    expect(hint).toContain('"Waterloo (in Quebec) [id:100]"');
+    expect(client.resolveCoordinate(meta, 'id:200', {}).resolved[0]!.member).toBe(
+      'Waterloo (in Ontario) [id:200]',
+    );
   });
 });
