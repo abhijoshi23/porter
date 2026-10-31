@@ -7,3 +7,5 @@ export * from './logger.js';
 export * from './pagination.js';
 export * from './rate-limit.js';
 export * from './server.js';
+export * from './download-cache.js';
+export * from './untrusted.js';

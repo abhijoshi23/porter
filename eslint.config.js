@@ -12,6 +12,11 @@ export default tseslint.config(
       // stdout belongs to the stdio transport; a stray console.log corrupts the JSON-RPC stream.
       'no-console': ['error', { allow: ['error', 'warn'] }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // Invisible characters in source hide what code really does; write them as \u escapes.
+      'no-irregular-whitespace': [
+        'error',
+        { skipStrings: false, skipTemplates: false, skipRegExps: false },
+      ],
     },
   },
 );
