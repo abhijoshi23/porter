@@ -30,4 +30,27 @@ describe('externalText', () => {
     expect(externalText(null)).toBe('');
     expect(externalText('   ')).toBe('');
   });
+
+  it.each([
+    ['unclosed comments', '<!--'.repeat(50_000)],
+    ['unclosed tags', '<'.repeat(100_000)],
+    ['unclosed scripts', '<script>'.repeat(20_000)],
+    ['entity-like runs', '&'.repeat(50_000) + 'a'.repeat(50_000)],
+  ])('stays fast on pathological input (%s)', (_label, input) => {
+    const started = performance.now();
+    externalText(input);
+    expect(performance.now() - started).toBeLessThan(100);
+  });
+
+  it('survives out-of-range numeric entities', () => {
+    expect(externalText('a &#9999999; b &#x110000; c &#65;')).toBe('a b c A');
+  });
+
+  it('keeps a stray "<" that is not a tag', () => {
+    expect(externalText('a < b and <i>c</i>')).toBe('a < b and c');
+  });
+
+  it('drops everything after an unclosed comment (hidden content stays hidden)', () => {
+    expect(externalText('visible <!-- hidden instructions')).toBe('visible');
+  });
 });

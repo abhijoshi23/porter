@@ -27,17 +27,67 @@ const ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
+/**
+ * Upper bound on input scanned. Output is capped at `maxChars` anyway; the headroom
+ * allows for markup that gets stripped. Bounding the input also bounds the cost of every
+ * step below, because hostile text can be arbitrarily long.
+ */
+const MAX_SCAN = 20_000;
+
+/**
+ * Removes every `open … close` span with a linear `indexOf` scan. A lazy regex like
+ * /<!--[\s\S]*?-->/ is quadratic on input such as "<!--<!--<!--…" with no closing
+ * marker (polynomial ReDoS, flagged by CodeQL js/polynomial-redos). An unclosed opener
+ * drops the rest of the text, which is the safe choice for hidden content.
+ */
+function stripSpans(s: string, open: string, close: string): string {
+  const lower = s.toLowerCase();
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const start = lower.indexOf(open, i);
+    if (start === -1) return out + s.slice(i);
+    out += `${s.slice(i, start)} `;
+    const end = lower.indexOf(close, start + open.length);
+    if (end === -1) return out;
+    i = end + close.length;
+  }
+}
+
+/** Replaces `<…>` tags with spaces in one pass. An unclosed `<` is kept as text. */
+function stripTags(s: string): string {
+  let out = '';
+  let tagStart = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (tagStart === -1) {
+      if (c === '<') tagStart = i;
+      else out += c;
+    } else if (c === '>') {
+      out += ' ';
+      tagStart = -1;
+    } else if (c === '<') {
+      out += s.slice(tagStart, i); // the earlier "<" wasn't a tag
+      tagStart = i;
+    }
+  }
+  return tagStart === -1 ? out : out + s.slice(tagStart);
+}
+
 export function externalText(raw: string | null | undefined, maxChars = 500): string {
   if (!raw) return '';
-  let s = raw
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (m, e: string) => {
+  let s = raw.slice(0, MAX_SCAN);
+  s = stripSpans(s, '<!--', '-->');
+  s = stripSpans(s, '<script', '</script>');
+  s = stripSpans(s, '<style', '</style>');
+  s = stripTags(s)
+    // Bounded repeats keep this linear.
+    .replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]{1,10});/gi, (m, e: string) => {
       if (e[0] === '#') {
         const code =
           e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : ' ';
+        // fromCodePoint throws above U+10FFFF, so hostile entities like &#9999999; must not crash us.
+        return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ' ';
       }
       return ENTITIES[e.toLowerCase()] ?? m;
     })
