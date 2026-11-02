@@ -2,7 +2,7 @@
 
 **MCP servers that give AI assistants safe, well-designed access to Canadian public data, Ontario transit, federal tenders and small-business accounting.**
 
-> 🚧 Early development. The toolkit, the open-data server and the transit server are done. See the [roadmap](#roadmap).
+> 🚧 Early development. The toolkit, the open-data and transit servers, and the eval runner are done. See the [roadmap](#roadmap).
 
 Porter is a monorepo of [Model Context Protocol](https://modelcontextprotocol.io) servers built on a shared toolkit. It targets the **2026-07-28** MCP spec with the v2 TypeScript SDK, and it still serves 2025-era clients such as Claude Desktop.
 
@@ -18,8 +18,20 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 | [`porter-hello`](packages/server-hello)           | ✅ (example) | Reference server showing the patterns                                                                             |
 | [`porter-opendata`](packages/server-opendata)     | ✅           | Ontario, Toronto and federal CKAN plus StatCan                                                                    |
 | [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
+| [`porter-evals`](packages/evals)                  | ✅ (private) | Eval runner: Claude Code headless or Ollama drivers, deterministic checks, Markdown reports                       |
 | `porter-tenders`                                  | Milestone 5  | CanadaBuys tender search and fit summaries                                                                        |
 | `porter-quickbooks`                               | Milestone 6  | QuickBooks Online sandbox, with confirmed writes                                                                  |
+
+## Evals
+
+A model gets a real request ("When are the next buses at King and James in Hamilton?"), uses Porter's servers over MCP against live data, and deterministic checks score what it did. Checks cover the right tools and arguments, the call budget, and honesty about scheduled versus live times.
+
+| Model                    | Passed          | Failed tool calls / task |
+| ------------------------ | --------------- | ------------------------ |
+| Claude Haiku             | **93%** (39/42) | 0.21 (baseline 0.71)     |
+| qwen2.5-coder:7b (local) | 50% (7/14)      | 0.36                     |
+
+The first run exposed two real bugs and five tool-design gaps; [tool-design.md](docs/tool-design.md#changelog-tool-names-descriptions-and-how-eval-scores-moved) records each finding, the change and how the numbers moved. Method and caveats: [docs/evals.md](docs/evals.md).
 
 ## Example
 
@@ -71,7 +83,7 @@ claude mcp add --transport stdio porter-hello -- node "$PWD/packages/server-hell
 1. ✅ Toolkit + CI
 2. ✅ Open data server
 3. ✅ Transit server
-4. Eval runner
+4. ✅ Eval runner ([docs/evals.md](docs/evals.md))
 5. Tenders server
 6. QuickBooks server
 7. Keel/Trillium adapters + remote deployment
