@@ -1,0 +1,26 @@
+{
+  "name": "@abhijoshi23/porter-evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Eval runner: measures whether models pick and chain Porter's tools correctly.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "porter-eval": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@abhijoshi23/porter-opendata": "workspace:*",
+    "@abhijoshi23/porter-transit": "workspace:*",
+    "@modelcontextprotocol/client": "2.4.0",
+    "zod": "4.6.7"
+  }
+}
