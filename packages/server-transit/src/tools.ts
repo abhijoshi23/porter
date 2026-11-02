@@ -9,6 +9,7 @@ import { coverageNote, serviceWindows } from './schedule.js';
 import {
   distanceM,
   modeName,
+  samePlace,
   resolveRoute,
   resolveStop,
   routeLabel,
@@ -171,7 +172,8 @@ export function findStops(deps: Deps) {
     description:
       'Finds stops and stations by name (e.g. "King and Victoria", "Union Station") or near a point (lat/lon). ' +
       'Returns stop ids (pass as "id:<stopId>" to other tools), the code printed on the stop sign, and the routes serving each stop. ' +
-      'Use when the user names a place loosely or a name was ambiguous.',
+      'Use it to explore an area, or when a name was ambiguous. Not needed before next_departures or plan_simple_trip: ' +
+      'they take stop names directly and already combine every stop of a station, terminal or intersection.',
     input: z.object({
       agency: agencyInput(enabled),
       query: z
@@ -189,7 +191,17 @@ export function findStops(deps: Deps) {
     output: z.object({
       stops: z.array(
         z.object({
+          stop: z
+            .string()
+            .describe(
+              'Pass this value as-is as stop/from/to to next_departures or plan_simple_trip. "ids:…" covers every stop at one place.',
+            ),
           stopId: z.string(),
+          stopIds: z
+            .array(z.string())
+            .describe(
+              'More than one when several stops are one place (corners of an intersection).',
+            ),
           label: z
             .string()
             .describe('Name, id, code and routes: show this to the user when choosing.'),
@@ -247,30 +259,60 @@ export function findStops(deps: Deps) {
             a.s.name.localeCompare(b.s.name),
         );
       }
-      const shown = matches.slice(0, limit);
+      // In a name search, one place is one result: the four corners of "King and James"
+      // come back as a single entry. In the first eval run, Haiku looked the stops up and
+      // then called next_departures once per corner.
+      const places: {
+        s: (typeof matches)[number]['s'];
+        d?: number;
+        ids: string[];
+        routeIds: string[];
+      }[] = [];
+      for (const m of matches) {
+        const place = query ? places.find((p) => samePlace(p.s, m.s)) : undefined;
+        if (place) {
+          place.ids.push(m.s.stopId);
+          place.routeIds = [...new Set([...place.routeIds, ...m.s.routeIds])];
+        } else {
+          places.push({
+            s: m.s,
+            ...(m.d !== undefined ? { d: m.d } : {}),
+            ids: [m.s.stopId],
+            routeIds: m.s.routeIds,
+          });
+        }
+      }
+      const shown = places.slice(0, limit);
       return {
         data: {
-          stops: shown.map(({ s, d }) => ({
+          stops: shown.map(({ s, d, ids, routeIds }) => ({
+            stop: ids.length > 1 ? `ids:${ids.join(',')}` : `id:${s.stopId}`,
             stopId: s.stopId,
-            label: stopLabel(db, s),
+            stopIds: ids,
+            label:
+              ids.length > 1
+                ? `${s.name} (${ids.length} stops at this place; routes ${routeNames(db, routeIds).join(', ')})`
+                : stopLabel(db, s),
             name: s.name,
             code: s.code,
             isStation: s.locationType === 1,
             lat: s.lat,
             lon: s.lon,
-            routes: routeNames(db, s.routeIds),
+            routes: routeNames(db, routeIds),
             ...(d !== undefined ? { distanceMeters: Math.round(d) } : {}),
           })),
-          totalMatches: matches.length,
+          totalMatches: places.length,
           feed: feedInfo(agency, db.meta),
         },
         summary:
           matches.length === 0
             ? `No ${agency.name} stops match${query ? ` "${query}"` : ''}${near ? ` within ${radiusMeters} m` : ''}.`
-            : `${matches.length} ${agency.name} stop(s) match; showing ${shown.length}: ` +
+            : `${places.length} ${agency.name} stop(s) match; showing ${shown.length}: ` +
               shown
                 .slice(0, 3)
-                .map(({ s }) => stopLabel(db, s))
+                .map(({ s, ids }) =>
+                  ids.length > 1 ? `${s.name} [ids:${ids.join(',')}]` : stopLabel(db, s),
+                )
                 .join('; ') +
               (shown.length > 3 ? '; …' : '.'),
       };
@@ -394,15 +436,33 @@ export function nextDepartures(deps: Deps) {
       const r = route ? resolveRoute(db, route) : undefined;
       const fromMs = after ? parseUserTime(after, tz, now) : now;
       const toMs = fromMs + windowMinutes * 60_000;
-      const { rows, total, rt, windows } = await upcoming(deps, agency, db, {
-        stopIds: resolved.stopIds,
+      const opts = { stopIds: resolved.stopIds, ...(r ? { routeIds: [r.routeId] } : {}) };
+      let { rows, total, rt, windows } = await upcoming(deps, agency, db, {
+        ...opts,
         fromMs,
         toMs,
-        ...(r ? { routeIds: [r.routeId] } : {}),
         limit,
       });
+      // Nothing in the window (off-peak GO, late night): report the next departures within
+      // a day instead of an empty list. In the eval run, a small model widened
+      // windowMinutes seven times in a row looking for the next Kitchener GO train.
+      let extendedNote: string | null = null;
+      if (rows.length === 0 && windowMinutes < 24 * 60) {
+        const later = await upcoming(deps, agency, db, {
+          ...opts,
+          fromMs: toMs,
+          toMs: fromMs + 24 * 3600_000,
+          limit: Math.min(limit, 5),
+        });
+        if (later.rows.length) {
+          ({ rows, rt } = later);
+          total = null;
+          windows = [...windows, ...later.windows];
+          extendedNote = `Nothing in the next ${windowMinutes} min; these are the next departures within 24 h.`;
+        }
+      }
 
-      const notes: string[] = [];
+      const notes: string[] = extendedNote ? [extendedNote] : [];
       const coverage = coverageNote(db.meta, windows);
       if (coverage) notes.push(coverage);
       if (
@@ -454,8 +514,8 @@ export function nextDepartures(deps: Deps) {
         },
         summary:
           departures.length === 0
-            ? `No ${r ? `route ${r.shortName ?? r.routeId} ` : ''}departures from ${resolved.stop.name} between ${formatClock(fromMs, tz)} and ${formatClock(toMs, tz)}.${notes.length ? ` ${notes.join(' ')}` : ' Try a longer windowMinutes or a later time.'}`
-            : `${total === departures.length ? `${total}` : `Next ${departures.length}${total ? ` of ${total}` : ''}`} departure(s) from ${resolved.stop.name}: ${first}${departures.length > 3 ? '; …' : '.'}${realtimeNote(rt)}`,
+            ? `No ${r ? `route ${r.shortName ?? r.routeId} ` : ''}departures from ${resolved.stop.name} between ${formatClock(fromMs, tz)} and ${formatClock(toMs, tz)}.${notes.length ? ` ${notes.join(' ')}` : ' Nothing within 24 h either.'}`
+            : `${total === departures.length ? `${total}` : `Next ${departures.length}${total ? ` of ${total}` : ''}`} departure(s) from ${resolved.stop.name}: ${first}${departures.length > 3 ? '; …' : '.'}${extendedNote ? ` ${extendedNote}` : ''}${realtimeNote(rt)}`,
       };
     },
   });
@@ -521,43 +581,56 @@ export function planSimpleTrip(deps: Deps) {
         });
       }
       const fromMs = after ? parseUserTime(after, tz, now) : now;
-      const toMs = fromMs + searchHours * 3600_000;
+      let toMs = fromMs + searchHours * 3600_000;
       const rt = await deps.realtime.tripUpdates(agency);
-      const windows = serviceWindows(db.meta, fromMs, toMs);
-
-      const found = [];
-      for (const w of windows) {
-        const rows = await db.directTrips({
-          fromIds: a.stopIds,
-          toIds: b.stopIds,
-          services: await db.servicesOn(w.date),
-          fromSecs: w.fromSecs,
-          toSecs: w.toSecs,
-          limit: limit + 10,
-        });
-        for (const r of rows) {
-          const depMs = w.startMs + r.dep * 1000;
-          const arrMs = w.startMs + r.arr * 1000;
-          const pd = predict(rt, {
-            tripId: r.tripId,
-            seq: r.fromSeq,
-            stopId: r.fromStopId,
-            serviceDate: w.date,
-            scheduledMs: depMs,
+      const search = async (startMs: number, endMs: number) => {
+        const out = [];
+        for (const w of serviceWindows(db.meta, startMs, endMs)) {
+          const rows = await db.directTrips({
+            fromIds: a.stopIds,
+            toIds: b.stopIds,
+            services: await db.servicesOn(w.date),
+            fromSecs: w.fromSecs,
+            toSecs: w.toSecs,
+            limit: limit + 10,
           });
-          if (pd.status === 'departed' || pd.status === 'canceled' || pd.status === 'skipped')
-            continue;
-          const pa = predict(rt, {
-            tripId: r.tripId,
-            seq: r.toSeq,
-            stopId: r.toStopId,
-            serviceDate: w.date,
-            scheduledMs: arrMs,
-          });
-          if (pa.status === 'skipped') continue;
-          found.push({ r, depMs, arrMs, pd, pa, eta: pa.expectedMs ?? arrMs });
+          for (const r of rows) {
+            const depMs = w.startMs + r.dep * 1000;
+            const arrMs = w.startMs + r.arr * 1000;
+            const pd = predict(rt, {
+              tripId: r.tripId,
+              seq: r.fromSeq,
+              stopId: r.fromStopId,
+              serviceDate: w.date,
+              scheduledMs: depMs,
+            });
+            if (pd.status === 'departed' || pd.status === 'canceled' || pd.status === 'skipped')
+              continue;
+            const pa = predict(rt, {
+              tripId: r.tripId,
+              seq: r.toSeq,
+              stopId: r.toStopId,
+              serviceDate: w.date,
+              scheduledMs: arrMs,
+            });
+            if (pa.status === 'skipped') continue;
+            out.push({ r, depMs, arrMs, pd, pa, eta: pa.expectedMs ?? arrMs });
+          }
+        }
+        return out;
+      };
+      let found = await search(fromMs, toMs);
+      // Nothing in the window (e.g. off-peak GO service): look up to a day ahead once,
+      // so the answer is "the next one is at 20:48" rather than a retry.
+      let extended = false;
+      if (found.length === 0 && searchHours < 24) {
+        found = await search(toMs, fromMs + 24 * 3600_000);
+        if (found.length) {
+          extended = true;
+          toMs = fromMs + 24 * 3600_000;
         }
       }
+      const windows = serviceWindows(db.meta, fromMs, toMs);
       found.sort((x, y) => x.eta - y.eta);
       const options = found.slice(0, limit).map(({ r, depMs, arrMs, pd, pa }) => {
         const rr = db.routes.get(r.routeId);
@@ -578,6 +651,11 @@ export function planSimpleTrip(deps: Deps) {
       });
 
       const notes: string[] = [];
+      if (extended) {
+        notes.push(
+          `No direct ride in the next ${searchHours} h; these are the next ones within 24 h.`,
+        );
+      }
       const coverage = coverageNote(db.meta, windows);
       if (coverage) notes.push(coverage);
       const routesAt = (ids: string[]) =>
@@ -605,11 +683,11 @@ export function planSimpleTrip(deps: Deps) {
           feed: feedInfo(agency, db.meta),
         },
         summary: best
-          ? `${options.length} direct option(s) from ${a.stop.name} to ${b.stop.name}. Best: route ${withRoute(best.route, best.headsign)} leaving ${formatClock(found[0]!.pd.expectedMs ?? found[0]!.depMs, tz)}, arriving ${formatClock(found[0]!.eta, tz)} (${best.rideMinutes} min on board).${realtimeNote(rt.state)}`.replace(
+          ? `${options.length} direct option(s) from ${a.stop.name} to ${b.stop.name}. Best: route ${withRoute(best.route, best.headsign)} leaving ${formatClock(found[0]!.pd.expectedMs ?? found[0]!.depMs, tz)}, arriving ${formatClock(found[0]!.eta, tz)} (${best.rideMinutes} min on board).${extended ? ` ${notes[0]}` : ''}${realtimeNote(rt.state)}`.replace(
               /\s+/g,
               ' ',
             )
-          : `No direct ride from ${a.stop.name} to ${b.stop.name} in the next ${searchHours} h. ${notes.join(' ')}`,
+          : `No direct ride from ${a.stop.name} to ${b.stop.name} in the next ${extended ? 24 : searchHours} h. ${notes.join(' ')}`,
       };
     },
   });

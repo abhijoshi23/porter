@@ -243,6 +243,41 @@ describe.each(ERAS)('porter-transit over the %s protocol', (era) => {
     expect(text(r)).toContain('Metrolinx API key');
   });
 
+  it('find_stops returns one intersection as one place, usable as-is (found by evals)', async () => {
+    t = await connectTestClient(factory(), era);
+    const f = sc<{ stops: { stop: string; stopIds: string[] }[] }>(
+      await call('find_stops', { agency: 'grt', query: 'King Main' }),
+    );
+    expect(f.stops).toHaveLength(1);
+    expect(f.stops[0]!.stopIds.sort()).toEqual(['S1', 'S2']);
+    const d = await call('next_departures', {
+      agency: 'Grand River Transit',
+      stop: f.stops[0]!.stop,
+    });
+    expect(d.isError).toBeFalsy();
+    expect(sc<{ stop: { stopIds: string[] } }>(d).stop.stopIds.sort()).toEqual(['S1', 'S2']);
+  });
+
+  it('an empty window reports the next departures and trips within a day (found by evals)', async () => {
+    t = await connectTestClient(factory(), era);
+    // After 10:00 on Monday nothing leaves Platform 2 until Tuesday's 09:00 (T5).
+    const d = await call('next_departures', { agency: 'grt', stop: 'id:S3B', after: '10:00' });
+    expect(sc<{ departures: Departure[] }>(d).departures.map((x) => x.scheduled)).toEqual([
+      '2026-11-03T09:00:00-05:00',
+    ]);
+    expect(text(d)).toContain('Nothing in the next 60 min');
+    const p = await call('plan_simple_trip', {
+      agency: 'grt',
+      from: 'id:S3B',
+      to: 'id:S4',
+      after: '10:00',
+    });
+    expect(sc<{ options: { departScheduled: string }[] }>(p).options[0]!.departScheduled).toBe(
+      '2026-11-03T09:00:00-05:00',
+    );
+    expect(text(p)).toContain('No direct ride in the next 3 h');
+  });
+
   it('lists only the enabled agencies, and explains a disabled one', async () => {
     t = await connectTestClient(factory(), era);
     const list = sc<{ agencies: { id: string }[] }>(await call('list_agencies', {}));

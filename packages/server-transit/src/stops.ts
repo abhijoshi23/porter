@@ -131,6 +131,30 @@ export function resolveStop(db: FeedDb, input: string): ResolvedStop {
       : null;
   };
 
+  // "ids:a,b,c": a group find_stops returned as one place (the corners of an intersection).
+  const idsMatch = /^ids:(.+)$/i.exec(raw);
+  if (idsMatch) {
+    const parts = idsMatch[1]!
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    const found = parts
+      .map((id) => db.stops.get(id))
+      .filter((x): x is Stop => Boolean(x && isBoardable(x)));
+    if (found.length === 0) {
+      throw new NotFoundError(`None of the stops ${parts.join(', ')} exist.`, {
+        hint: 'Call find_stops to look the stop up by name or location.',
+      });
+    }
+    return {
+      label: `${found[0]!.name} (${found.length} stops: ${found.map((f) => `id:${f.stopId}`).join(', ')})`,
+      stopIds: [...new Set(found.flatMap((f) => boardingIds(db, f)))],
+      stop: found[0]!,
+      how: 'id',
+    };
+  }
+
   // Explicit "id:<stop_id>", the form every label we return uses.
   const idMatch = /^id:(.+)$/i.exec(raw);
   if (idMatch) {
@@ -164,7 +188,7 @@ export function resolveStop(db: FeedDb, input: string): ResolvedStop {
   }
   const scored = [...db.stops.values()]
     .filter(isBoardable)
-    .map((s) => ({ s, score: score(want, tokens(s.name)) }))
+    .map((s) => ({ s, score: stopScore(db, want, s) }))
     .filter((x) => x.score > 0);
   if (scored.length === 0) {
     throw new NotFoundError(`No stop matches "${raw}".`, {
@@ -189,6 +213,25 @@ export function resolveStop(db: FeedDb, input: string): ResolvedStop {
     return { label: stopLabel(db, s), stopIds: boardingIds(db, s), stop: s, how: 'name' };
   }
 
+  // A rider naming a station means the station: TTC "Finch Station" also matches 35 bus
+  // stops on Finch Ave, and GO "Union Station" matches the train station and the bus
+  // terminal. When exactly one candidate is a station or rail stop, take it, and say
+  // what else matched so the choice is visible and reversible.
+  const stationLike = cands.filter((c) => isStationLike(db, c));
+  if (stationLike.length === 1 && cands.length > 1) {
+    const s = stationLike[0]!;
+    const others = cands.filter((c) => c !== s);
+    return {
+      label: `${stopLabel(db, s)}; also matched ${others.length} other stop(s), e.g. ${others
+        .slice(0, 3)
+        .map((o) => `"${stopLabel(db, o)}"`)
+        .join(', ')}`,
+      stopIds: boardingIds(db, s),
+      stop: s,
+      how: 'name',
+    };
+  }
+
   const group = sameNameCluster(cands);
   if (group) {
     const s = group[0]!;
@@ -201,6 +244,26 @@ export function resolveStop(db: FeedDb, input: string): ResolvedStop {
     };
   }
   throw ambiguous(db, raw, cands);
+}
+
+/** Words riders add to station names that the data may leave out ("Finch Station" is "Finch"). */
+const STATION_WORDS = new Set(['stn', 'go', 'terminal']);
+const RAIL_TYPES = new Set([0, 1, 2]); // streetcar/LRT, subway, rail
+
+/** A parent station, or a stop served by rail, subway or LRT (GO has no parent stations). */
+function isStationLike(db: FeedDb, s: Stop): boolean {
+  return (
+    s.locationType === 1 || s.routeIds.some((r) => RAIL_TYPES.has(db.routes.get(r)?.type ?? -1))
+  );
+}
+
+function stopScore(db: FeedDb, want: string[], s: Stop): number {
+  const have = tokens(s.name);
+  const plain = score(want, have);
+  if (!isStationLike(db, s)) return plain;
+  const strip = (ts: string[]) => ts.filter((t) => !STATION_WORDS.has(t));
+  const w = strip(want);
+  return w.length ? Math.max(plain, score(w, strip(have))) : plain;
 }
 
 /** Exact token-set match scores highest, then all words present, then word prefixes. */
@@ -221,15 +284,16 @@ function score(want: string[], have: string[]): number {
  * "KING at JAMES" and "JAMES at KING".
  */
 function sameNameCluster(cands: Stop[]): Stop[] | null {
-  const key = (s: Stop) => [...new Set(tokens(s.name))].sort().join(' ');
-  const name = key(cands[0]!);
-  if (!cands.every((c) => key(c) === name)) return null;
   const a = cands[0]!;
-  if (a.lat == null || a.lon == null) return null;
-  const near = cands.every(
-    (c) => c.lat != null && c.lon != null && distanceM(a.lat!, a.lon!, c.lat, c.lon) <= 400,
-  );
-  return near ? cands : null;
+  return cands.every((c) => samePlace(a, c)) ? cands : null;
+}
+
+/** The same name in any word order, within 400 m. */
+export function samePlace(a: Stop, b: Stop): boolean {
+  const key = (s: Stop) => [...new Set(tokens(s.name))].sort().join(' ');
+  if (key(a) !== key(b)) return false;
+  if (a.lat == null || a.lon == null || b.lat == null || b.lon == null) return a === b;
+  return distanceM(a.lat, a.lon, b.lat, b.lon) <= 400;
 }
 
 function ambiguous(db: FeedDb, raw: string, cands: Stop[]): InvalidInputError {

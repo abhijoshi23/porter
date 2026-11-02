@@ -103,8 +103,32 @@ export const AGENCIES: Record<AgencyId, Agency> = {
   },
 };
 
+/**
+ * Names people (and models) actually use. Every model in the first eval run passed
+ * "GO Transit" rather than "go", which cost a failed call each time.
+ */
+const ALIASES: Record<string, AgencyId> = {
+  grandrivertransit: 'grt',
+  grandriver: 'grt',
+  ion: 'grt',
+  regionofwaterloo: 'grt',
+  hamiltonstreetrailway: 'hsr',
+  hamiltontransit: 'hsr',
+  torontotransitcommission: 'ttc',
+  torontotransit: 'ttc',
+  gotransit: 'go',
+  metrolinx: 'go',
+};
+
+export function resolveAgencyId(input: string): AgencyId | undefined {
+  const key = input.toLowerCase().replace(/[^a-z]/g, '');
+  if ((AGENCY_IDS as readonly string[]).includes(key)) return key as AgencyId;
+  return ALIASES[key] ?? ALIASES[key.replace(/transit$/, '')];
+}
+
 export function getAgency(id: string, enabled: readonly AgencyId[]): Agency {
-  const a = AGENCIES[id.toLowerCase() as AgencyId];
+  const resolved = resolveAgencyId(id);
+  const a = resolved ? AGENCIES[resolved] : undefined;
   if (!a) {
     throw new InvalidInputError(`Unknown agency "${id}".`, {
       hint: `Use one of: ${enabled.join(', ')}. Call list_agencies for details.`,
