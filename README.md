@@ -2,7 +2,7 @@
 
 **MCP servers that give AI assistants safe, well-designed access to Canadian public data, Ontario transit, federal tenders and small-business accounting.**
 
-> 🚧 Early development. The toolkit and the open-data server are done. See the [roadmap](#roadmap).
+> 🚧 Early development. The toolkit, the open-data server and the transit server are done. See the [roadmap](#roadmap).
 
 Porter is a monorepo of [Model Context Protocol](https://modelcontextprotocol.io) servers built on a shared toolkit. It targets the **2026-07-28** MCP spec with the v2 TypeScript SDK, and it still serves 2025-era clients such as Claude Desktop.
 
@@ -16,8 +16,8 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 | ------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
 | [`@abhijoshi23/porter-toolkit`](packages/toolkit) | ✅           | Server factory (stdio and Streamable HTTP), `defineTool`, resilient HTTP, pagination and truncation, test harness |
 | [`porter-hello`](packages/server-hello)           | ✅ (example) | Reference server showing the patterns                                                                             |
-| `porter-opendata`                                 | Milestone 2  | Ontario, Toronto and federal CKAN plus StatCan                                                                    |
-| `porter-transit`                                  | Milestone 3  | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
+| [`porter-opendata`](packages/server-opendata)     | ✅           | Ontario, Toronto and federal CKAN plus StatCan                                                                    |
+| [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
 | `porter-tenders`                                  | Milestone 5  | CanadaBuys tender search and fit summaries                                                                        |
 | `porter-quickbooks`                               | Milestone 6  | QuickBooks Online sandbox, with confirmed writes                                                                  |
 
@@ -26,6 +26,10 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 > **You:** How has unemployment in Kitchener–Cambridge–Waterloo changed since 2019?
 >
 > **Assistant** (via `statcan_find_table` → `statcan_get_table` → `statcan_get_series`): The seasonally adjusted unemployment rate (3-month moving average) rose from **5.0% in January 2019** to **7.7% in September 2026**. Source: Statistics Canada, Table 14-10-0459-01 (DOI 10.25318/1410045901-eng), Statistics Canada Open Licence.
+
+> **You:** What's the first train from Kitchener to Union after 6 a.m.?
+>
+> **Assistant** (via `plan_simple_trip`): The next direct GO train leaves **Kitchener GO at 06:07** and arrives at **Union Station at 07:47** (1 h 40 min). This is the published schedule: GO doesn't offer open live predictions. Source: GO Transit open data (Metrolinx).
 
 ## Toolkit at a glance
 
@@ -66,7 +70,7 @@ claude mcp add --transport stdio porter-hello -- node "$PWD/packages/server-hell
 0. ✅ Research ([docs/mcp-notes.md](docs/mcp-notes.md))
 1. ✅ Toolkit + CI
 2. ✅ Open data server
-3. Transit server
+3. ✅ Transit server
 4. Eval runner
 5. Tenders server
 6. QuickBooks server

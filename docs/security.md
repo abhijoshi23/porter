@@ -47,6 +47,20 @@ Tested by the attack suite in `packages/server-opendata/src/sql.test.ts`: stacke
 
 `DownloadCache` streams files to disk with a byte cap (`PORTER_MAX_DOWNLOAD_MB`, default 100). It checks `Content-Length` first and enforces the cap while streaming, because servers can lie. Writes go to a temp file and are renamed into place, so a crash never leaves a truncated file that looks valid. Cache filenames are URL hashes, never derived from upstream names, so there's no path traversal.
 
+### GTFS archives (`porter-transit`)
+
+Feeds are ZIP files from agency servers, read by a small built-in reader (`packages/server-transit/src/zip.ts`) rather than a dependency:
+
+- **No zip slip.** Only the GTFS files we ask for are extracted, each to `<workdir>/<expected name>`. The path stored in the archive (which could be `../../x`) is never used as a destination.
+- **No zip bombs.** Inflated bytes are counted while streaming and the extraction aborts past `PORTER_TRANSIT_MAX_UNZIPPED_MB` (default 1 GB). Declared sizes aren't trusted.
+- **Integrity.** Each file's CRC-32 is checked. Encrypted entries, multi-disk archives and ZIP64 are refused.
+- **Bad downloads don't stick.** If a download can't be unzipped or loaded (e.g. an HTML maintenance page served with status 200), it is dropped from the cache so the next call fetches again.
+- **SQL is ours.** The schedule database is queried only with fixed, parameterized SQL; the model never writes SQL here. Values like stop IDs are bound as parameters.
+
+### Realtime feeds
+
+GTFS-Realtime is decoded by a bounds-checked protobuf reader: every length is checked against the enclosing message, truncated or malformed input raises a normal error (tested against every truncation of a valid message), and unknown fields are skipped. Alert text is publisher-written, so it goes through `externalText()` like any other external text. A realtime feed older than `PORTER_TRANSIT_REALTIME_MAX_AGE_S` is reported as stale and ignored, never shown as live.
+
 ## HTTP mode
 
 - **DNS-rebinding protection:** `Host` and `Origin` are validated before the MCP handler. Loopback binds accept only localhost names, and public binds require `PORTER_ALLOWED_HOSTS`.
@@ -57,4 +71,4 @@ Tested by the attack suite in `packages/server-opendata/src/sql.test.ts`: stacke
 - Exact dependency versions (`save-exact`) and a committed lockfile installed with `--frozen-lockfile` in CI.
 - Dependabot for npm and GitHub Actions. CodeQL on every push and weekly.
 - npm provenance on publish (Changesets release workflow, `id-token: write`).
-- Lint forbids invisible or irregular whitespace characters in source, including inside strings and regexes, so code can't hide what it does.
+- Lint forbids invisible or irregular whitespace characters in source, including inside strings and regexes, and literal bidi control characters ("Trojan Source", CVE-2021-42574), so code can't display differently from how it runs.
