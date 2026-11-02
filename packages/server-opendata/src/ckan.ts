@@ -131,6 +131,22 @@ export function parseDatasetId(datasetId: string): { portal: PortalId; name: str
 
 const QUERYABLE = new Set(['CSV']);
 
+/**
+ * CKAN's package_search returns uploaded files with *relative* URLs on some portals
+ * (open.canada.ca gives "/data/dataset/…/download/x.csv"), while package_show returns
+ * them absolute. Resolve against the portal so both agree. Only http(s) is kept, so a
+ * catalogue entry can't point the downloader at another scheme.
+ */
+export function absoluteUrl(raw: string | null | undefined, base: string): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw.trim(), base);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function toDataset(portal: PortalId, p: RawPackage): DatasetInfo {
   const known = p.license_id ? LICENCES[p.license_id] : undefined;
   return {
@@ -143,8 +159,9 @@ function toDataset(portal: PortalId, p: RawPackage): DatasetInfo {
     lastModified: p.metadata_modified ?? null,
     pageUrl: PORTALS[portal].page(p),
     resources: p.resources
-      .filter((r) => r.url)
-      .map((r) => {
+      .map((r) => ({ r, url: absoluteUrl(r.url, PORTALS[portal].api) }))
+      .filter((x): x is { r: (typeof p.resources)[number]; url: string } => x.url !== null)
+      .map(({ r, url }) => {
         const format = (r.format ?? '').trim().toUpperCase() || 'UNKNOWN';
         const size =
           r.size === null || r.size === undefined || r.size === '' ? NaN : Number(r.size);
@@ -152,7 +169,7 @@ function toDataset(portal: PortalId, p: RawPackage): DatasetInfo {
           resourceId: r.id,
           name: externalText(r.name_translated?.en ?? r.name ?? r.id, 150),
           format,
-          url: r.url!,
+          url,
           sizeBytes: Number.isFinite(size) ? size : null,
           lastModified: r.last_modified ?? null,
           queryable: QUERYABLE.has(format),

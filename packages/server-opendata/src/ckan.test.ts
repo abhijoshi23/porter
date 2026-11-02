@@ -1,6 +1,6 @@
 import { InvalidInputError } from '@abhijoshi23/porter-toolkit';
 import { describe, expect, it } from 'vitest';
-import { parseDatasetId } from './ckan.js';
+import { absoluteUrl, parseDatasetId } from './ckan.js';
 
 describe('parseDatasetId', () => {
   it('splits portal and name', () => {
@@ -17,4 +17,19 @@ describe('parseDatasetId', () => {
       expect(() => parseDatasetId(id)).toThrow(InvalidInputError);
     },
   );
+});
+
+describe('absoluteUrl', () => {
+  const api = 'https://open.canada.ca/data/api/3/action';
+  it('resolves the relative resource URLs package_search returns on open.canada.ca', () => {
+    expect(absoluteUrl('/data/dataset/x/resource/y/download/wages.csv', api)).toBe(
+      'https://open.canada.ca/data/dataset/x/resource/y/download/wages.csv',
+    );
+    expect(absoluteUrl('https://example.org/a.csv', api)).toBe('https://example.org/a.csv');
+  });
+  it('drops empty URLs and non-http schemes', () => {
+    expect(absoluteUrl('', api)).toBeNull();
+    expect(absoluteUrl('file:///etc/passwd', api)).toBeNull();
+    expect(absoluteUrl('javascript:alert(1)', api)).toBeNull();
+  });
 });
