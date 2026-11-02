@@ -18,16 +18,19 @@ export default tseslint.config(
         { skipStrings: false, skipTemplates: false, skipRegExps: false },
       ],
       // Bidi controls aren't whitespace, so the rule above misses them, yet they can make
-      // code display differently from how it runs ("Trojan Source", CVE-2021-42574).
+      // code display differently from how it runs ("Trojan Source", CVE-2021-42574). Same
+      // for other control characters: a literal backspace once hid inside a regex here.
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'Literal[raw=/[\\u202A-\\u202E\\u2066-\\u2069]/]',
-          message: 'Write bidi control characters as \\u escapes.',
+          selector:
+            'Literal[raw=/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069]/]',
+          message: 'Write control and bidi characters as \\u escapes.',
         },
         {
-          selector: 'TemplateElement[value.raw=/[\\u202A-\\u202E\\u2066-\\u2069]/]',
-          message: 'Write bidi control characters as \\u escapes.',
+          selector:
+            'TemplateElement[value.raw=/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069]/]',
+          message: 'Write control and bidi characters as \\u escapes.',
         },
       ],
     },
