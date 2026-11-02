@@ -250,3 +250,138 @@ describe('look-alike members (as in census table 98-10-0002)', () => {
     );
   });
 });
+
+describe('census tables (no vectors)', () => {
+  it('reads by coordinate when getSeriesInfo answers vectorId 0', async () => {
+    const urls: string[] = [];
+    const json = (b: unknown) =>
+      new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } });
+    const http = {
+      request: async (url: string) => {
+        urls.push(url);
+        if (url.endsWith('/getSeriesInfoFromCubePidCoord')) {
+          return json([
+            {
+              status: 'SUCCESS',
+              object: {
+                responseStatusCode: 0,
+                vectorId: 0,
+                SeriesTitleEn: 'Waterloo;Population, 2021',
+                memberUomCode: 0,
+              },
+            },
+          ]);
+        }
+        if (url.endsWith('/getDataFromCubePidCoordAndLatestNPeriods')) {
+          return json([
+            {
+              status: 'SUCCESS',
+              object: {
+                vectorId: 0,
+                vectorDataPoint: [
+                  { refPer: '2021-01-01', value: 121436, statusCode: 0, symbolCode: 0 },
+                ],
+              },
+            },
+          ]);
+        }
+        throw new Error(`unexpected ${url}`);
+      },
+      getJson: async (url: string) => {
+        urls.push(String(url));
+        if (String(url).endsWith('/getCodeSets'))
+          return {
+            status: 'SUCCESS',
+            object: { scalar: [], frequency: [], symbol: [], status: [], uom: [] },
+          };
+        throw new Error(`vector endpoint must not be used for census tables: ${url}`);
+      },
+    };
+    const client = new StatCanClient(http as never, {} as never);
+    const meta = {
+      productId: 98100002,
+      cubeTitleEn: 'Population',
+      footnote: [],
+      dimension: [],
+    } as unknown as CubeMeta;
+    const s = await client.series(meta, '2868.1.0.0.0.0.0.0.0.0', {
+      start: '2016-01-01',
+      end: '2026-11-02',
+    });
+    expect(s.vectorId).toBeNull();
+    expect(s.points).toEqual([{ period: '2021-01-01', value: 121436 }]);
+    expect(urls.some((u) => u.includes('getDataFromVector'))).toBe(false);
+  });
+});
+
+describe('option labels are accepted back verbatim', () => {
+  const geo = [
+    m(1, 'Canada'),
+    m(35, 'Ontario', 0, 1),
+    m(2864, 'Waterloo', 0, 35),
+    m(2868, 'Waterloo', 0, 2864),
+    m(500, 'Waterloo (CY), Ontario', 0, 35),
+  ];
+  it('by the [id:n] suffix', () => {
+    expect(matchMember(geo, 'Waterloo (in Waterloo, Ontario) [id:2868]')).toMatchObject({
+      member: { memberId: 2868 },
+    });
+  });
+  it('by stripping the "(in …)" context, even when it contains parentheses', () => {
+    // Real label from table 17-10-0155-01, which Haiku passed back during the evals.
+    expect(
+      matchMember(
+        geo,
+        'Waterloo (CY), Ontario (in Census subdivisions with 5,000-plus population, Ontario)',
+      ),
+    ).toMatchObject({ kind: 'exact', member: { memberId: 500 } });
+    expect(matchMember(geo, 'Ontario (contains 2 sub-areas)')).toMatchObject({
+      member: { memberId: 35 },
+    });
+  });
+});
+
+describe('fewer round trips (found by evals)', () => {
+  const csds = [
+    m(1, 'Canada'),
+    m(24, 'Quebec', 0, 1),
+    m(35, 'Ontario', 0, 1),
+    m(2864, 'Waterloo', 0, 35),
+    m(2868, 'Waterloo', 0, 2864),
+    m(1327, 'Waterloo', 0, 24),
+  ];
+  const meta = {
+    productId: 98100002,
+    cubeTitleEn: 'Population and dwelling counts',
+    footnote: [],
+    dimension: [
+      { dimensionPositionId: 1, dimensionNameEn: 'Geographic name', member: csds },
+      {
+        dimensionPositionId: 2,
+        dimensionNameEn: 'Population and dwelling counts (13)',
+        member: [m(1, 'Population, 2021'), m(2, 'Population, 2016')],
+      },
+    ],
+  } as unknown as CubeMeta;
+  const client = new StatCanClient({} as never, {} as never);
+
+  it('reports an ambiguous place and a missing member in one error', () => {
+    let e: InvalidInputError | undefined;
+    try {
+      client.resolveCoordinate(meta, 'Waterloo', {});
+    } catch (err) {
+      e = err as InvalidInputError;
+    }
+    expect(e!.message).toContain('matches several Geographic name options');
+    expect(e!.message).toContain('Choose a value for "Population and dwelling counts (13)"');
+    expect(e!.hint).toContain('[id:2868]');
+    expect(e!.hint).toContain('"Population, 2021"');
+  });
+
+  it('uses the "(in …)" context of a label without its id', () => {
+    const r = client.resolveCoordinate(meta, 'Waterloo (in Waterloo, Ontario)', {
+      'Population and dwelling counts (13)': 'Population, 2021',
+    });
+    expect(r.coordinate).toBe('2868.1.0.0.0.0.0.0.0.0');
+  });
+});

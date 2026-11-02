@@ -199,15 +199,37 @@ export type MemberMatch =
  * word. Several matches mean ambiguous, and we report the candidates instead of guessing.
  * That is the Waterloo (city) vs Waterloo (region) vs Kitchener-Cambridge-Waterloo (CMA) trap.
  */
+/** Drops the context memberLabel() appends: " (in Waterloo, Ontario)", " (contains 7 sub-areas)". */
+function stripLabelContext(label: string): string {
+  // Anchored on "(in " / "(contains " with no leading \s*, so matching stays linear.
+  return label.replace(/\((?:in |contains )[^()]*(?:\([^()]*\)[^()]*)*\)\s*$/i, '').trim();
+}
+
 export function matchMember(members: readonly Member[], query: string): MemberMatch {
   // Escape hatch when several members share a name (three CSDs all called "Waterloo"):
   // error messages list "id:<n>", which the model can pass back verbatim.
-  const byId = /^\s*id:(\d+)\s*$/i.exec(query);
+  // Also accept a full option label as we print it, "Waterloo (in Ontario) [id:2868]":
+  // models copy options back verbatim, and rejecting our own label wastes a call.
+  const byId = /(?:^|\[)\s*id:(\d+)\s*\]?\s*$/i.exec(query);
   if (byId) {
     const hit = members.find((m) => m.memberId === Number(byId[1]));
     return hit ? { kind: 'exact', member: hit, similar: [] } : { kind: 'none' };
   }
-  const q = normalize(query);
+  const r = matchName(members, stripLabelContext(query));
+  // "Waterloo (in Waterloo, Ontario)": the context names which Waterloo. Use it to narrow
+  // an ambiguous result by comparing full labels (cheap: only the few candidates).
+  if (r.kind === 'ambiguous' && stripLabelContext(query) !== query.trim()) {
+    const want = normalize(query);
+    const hits = r.candidates.filter(
+      (m) => normalize(memberLabel(m, members).replace(/\s*\[id:\d+\]$/, '')) === want,
+    );
+    if (hits.length === 1) return { kind: 'exact', member: hits[0]!, similar: [] };
+  }
+  return r;
+}
+
+function matchName(members: readonly Member[], name: string): MemberMatch {
+  const q = normalize(name);
   if (!q) return { kind: 'none' };
   const live = members.filter((m) => !m.terminated);
   const pool = live.length ? live : members;
@@ -385,6 +407,10 @@ export class StatCanClient {
     );
     const resolved: { dimension: string; member: string; how: string }[] = [];
     const ids: number[] = [];
+    // Report every problem in one error, not one per call: in the evals, models fixed an
+    // ambiguous geography, then learned a member was missing, then fixed that, each a
+    // separate round trip.
+    const problems: { message: string; hint: string }[] = [];
 
     for (const dim of [...meta.dimension].sort(
       (a, b) => a.dimensionPositionId - b.dimensionPositionId,
@@ -400,20 +426,18 @@ export class StatCanClient {
       if (wanted !== undefined) {
         const m = matchMember(dim.member, wanted);
         if (m.kind === 'ambiguous') {
-          throw new InvalidInputError(
-            `"${wanted}" matches several ${dim.dimensionNameEn} options.`,
-            {
-              hint: `Pick one exactly (pass the name, or id:<n> for duplicates): ${listNames(m.candidates, 25, dim.member, geo)}. (E.g. a city, its region and its census metropolitan area are different geographies.)`,
-            },
-          );
+          problems.push({
+            message: `"${wanted}" matches several ${dim.dimensionNameEn} options.`,
+            hint: `For ${dim.dimensionNameEn}, pick one exactly (pass the name, or id:<n> for duplicates): ${listNames(m.candidates, 25, dim.member, geo)}. (E.g. a city, its region and its census metropolitan area are different geographies.)`,
+          });
+          continue;
         }
         if (m.kind === 'none') {
-          throw new InvalidInputError(
-            `"${wanted}" is not an option for "${dim.dimensionNameEn}" in this table.`,
-            {
-              hint: `Options: ${listNames(dim.member, 25, dim.member, geo)}.`,
-            },
-          );
+          problems.push({
+            message: `"${wanted}" is not an option for "${dim.dimensionNameEn}" in this table.`,
+            hint: `${dim.dimensionNameEn} options: ${listNames(dim.member, 25, dim.member, geo)}.`,
+          });
+          continue;
         }
         chosen = m.member;
         how = m.kind === 'exact' ? 'matched' : `matched "${wanted}"`;
@@ -431,9 +455,11 @@ export class StatCanClient {
           chosen = first;
           how = 'default';
         } else {
-          throw new InvalidInputError(`Choose a value for "${dim.dimensionNameEn}".`, {
+          problems.push({
+            message: `Choose a value for "${dim.dimensionNameEn}".`,
             hint: `Pass members: { "${dim.dimensionNameEn}": "<one of: ${listNames(dim.member, 25, dim.member, geo)}>" }${geo ? ' or use the geography argument' : ''}.`,
           });
+          continue;
         }
       }
       ids.push(chosen!.memberId);
@@ -446,8 +472,14 @@ export class StatCanClient {
 
     if (remaining.size) {
       const unknown = [...remaining.values()].map((r) => `"${r.key}"`).join(', ');
-      throw new InvalidInputError(`Unknown dimension(s) ${unknown} for this table.`, {
+      problems.push({
+        message: `Unknown dimension(s) ${unknown} for this table.`,
         hint: `Dimensions are: ${meta.dimension.map((d) => d.dimensionNameEn).join(', ')}.`,
+      });
+    }
+    if (problems.length) {
+      throw new InvalidInputError(problems.map((p) => p.message).join(' '), {
+        hint: problems.map((p) => p.hint).join(' '),
       });
     }
     while (ids.length < 10) ids.push(0);
@@ -459,7 +491,7 @@ export class StatCanClient {
     coordinate: string,
     range: { start: string; end: string },
   ): Promise<{
-    vectorId: number;
+    vectorId: number | null;
     title: string;
     unit: string;
     scalarFactor: string;
@@ -472,19 +504,38 @@ export class StatCanClient {
     });
     const info = seriesInfo.safeParse(await infoRes.json());
     const obj = info.success ? info.data[0]?.object : undefined;
-    if (!obj || obj.responseStatusCode !== 0 || !obj.vectorId) {
+    if (!obj || obj.responseStatusCode !== 0) {
       throw new NotFoundError('This table has no series for that combination of members.', {
         hint: 'Some combinations are not published. Call statcan_get_table to check the options, or change one selection.',
       });
     }
 
-    const url = new URL(`${WDS}/getDataFromVectorByReferencePeriodRange`);
-    // WDS expects the vector IDs as a quoted, comma-separated list.
-    url.searchParams.set('vectorIds', `"${obj.vectorId}"`);
-    url.searchParams.set('startRefPeriod', range.start);
-    url.searchParams.set('endReferencePeriod', range.end);
-    const data = await this.http.getJson(url, vectorData);
-    const raw = data[0]?.status === 'SUCCESS' ? (data[0].object?.vectorDataPoint ?? []) : [];
+    let raw: z.infer<typeof dataPoint>[];
+    if (obj.vectorId) {
+      const url = new URL(`${WDS}/getDataFromVectorByReferencePeriodRange`);
+      // WDS expects the vector IDs as a quoted, comma-separated list.
+      url.searchParams.set('vectorIds', `"${obj.vectorId}"`);
+      url.searchParams.set('startRefPeriod', range.start);
+      url.searchParams.set('endReferencePeriod', range.end);
+      const data = await this.http.getJson(url, vectorData);
+      raw = data[0]?.status === 'SUCCESS' ? (data[0].object?.vectorDataPoint ?? []) : [];
+    } else {
+      // Census tables (98-xx) have no vectors: getSeriesInfo answers with vectorId 0, and
+      // the vector endpoints return nothing. Read by coordinate instead. There is no date
+      // range variant, so fetch the latest periods and filter here; census tables hold
+      // only a handful of periods.
+      const res = await this.http.request(`${WDS}/getDataFromCubePidCoordAndLatestNPeriods`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify([{ productId: meta.productId, coordinate, latestN: 100 }]),
+      });
+      const data = vectorData.safeParse(await res.json());
+      const all =
+        data.success && data.data[0]?.status === 'SUCCESS'
+          ? (data.data[0].object?.vectorDataPoint ?? [])
+          : [];
+      raw = all.filter((p) => p.refPer >= range.start && p.refPer <= range.end);
+    }
 
     const codes = await this.codes();
     const statusOf = (code: number | null | undefined) => {
@@ -517,7 +568,7 @@ export class StatCanClient {
     });
 
     return {
-      vectorId: obj.vectorId,
+      vectorId: obj.vectorId || null,
       title: obj.SeriesTitleEn ?? '',
       unit: codes.uom.find((u) => u.memberUomCode === obj.memberUomCode)?.memberUomEn ?? 'unknown',
       scalarFactor:

@@ -170,7 +170,7 @@ describe.each(ERAS)('porter-opendata over the %s protocol', (era) => {
       members: { 'Labour force characteristics': 'jobless rate' },
     });
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain('Options: "Population"');
+    expect(text(r)).toContain('Labour force characteristics options: "Population"');
     expect(text(r)).toContain('"Unemployment rate"');
   });
 

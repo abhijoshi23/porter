@@ -467,6 +467,7 @@ export function statcanGetSeries(deps: Deps) {
       productId: z.union([z.number(), z.string()]).describe('From statcan_find_table.'),
       geography: z
         .string()
+        .max(300)
         .optional()
         .describe('Place name, e.g. "Hamilton" or "Kitchener-Cambridge-Waterloo".'),
       members: z
@@ -478,12 +479,17 @@ export function statcanGetSeries(deps: Deps) {
       startDate: z
         .string()
         .optional()
-        .describe('YYYY, YYYY-MM or YYYY-MM-DD. Default: 5 years before endDate.'),
+        .describe(
+          'YYYY, YYYY-MM or YYYY-MM-DD. Default: 5 years before the latest data (or before endDate).',
+        ),
       endDate: z.string().optional().describe('Same formats. Default: today.'),
     }),
     output: z.object({
       productId: z.number(),
-      vectorId: z.number(),
+      vectorId: z
+        .number()
+        .nullable()
+        .describe('StatCan vector ID; null for census tables, which are read by coordinate.'),
       seriesTitle: z.string(),
       resolved: z.array(z.object({ dimension: z.string(), member: z.string(), how: z.string() })),
       unit: z.string(),
@@ -500,13 +506,19 @@ export function statcanGetSeries(deps: Deps) {
     }),
     handler: async ({ productId, geography, members, startDate, endDate }) => {
       const pid = parseProductId(productId);
-      const end = endDate ? toRefDate(endDate, 'end') : new Date().toISOString().slice(0, 10);
+      const meta = await deps.statcan.metadata(pid);
+      // Default window: the five years up to the table's latest data, not up to today. A
+      // census table's only period is 2021-01-01, and "five years before today" would miss
+      // it; so would any table that has stopped updating.
+      const today = new Date().toISOString().slice(0, 10);
+      const end = endDate ? toRefDate(endDate, 'end') : today;
+      const anchor =
+        !endDate && meta.cubeEndDate && meta.cubeEndDate < end ? meta.cubeEndDate : end;
       const start = startDate
         ? toRefDate(startDate, 'start')
-        : `${Number(end.slice(0, 4)) - 5}${end.slice(4)}`;
+        : `${Number(anchor.slice(0, 4)) - 5}${anchor.slice(4, 10)}`;
       if (start > end) throw new InvalidInputError('startDate is after endDate.');
 
-      const meta = await deps.statcan.metadata(pid);
       const { coordinate, resolved } = deps.statcan.resolveCoordinate(meta, geography, members);
       const s = await deps.statcan.series(meta, coordinate, { start, end });
       const capped = truncateRows(s.points, {
@@ -519,10 +531,16 @@ export function statcanGetSeries(deps: Deps) {
       const first = withValues[0];
       const last = withValues.at(-1);
       const nulls = pts.length - withValues.length;
+      const units =
+        s.unit === 'unknown' && s.scalarFactor === 'units'
+          ? ''
+          : ` (${s.unit}${s.scalarFactor !== 'units' ? `, ${s.scalarFactor}` : ''})`;
       const range =
-        first && last
-          ? ` ${first.period}: ${first.value} → ${last.period}: ${last.value} (${s.unit}${s.scalarFactor !== 'units' ? `, ${s.scalarFactor}` : ''}).`
-          : ' No published values in this range.';
+        !first || !last
+          ? ' No published values in this range.'
+          : first === last
+            ? ` ${first.period}: ${first.value}${units}.`
+            : ` ${first.period}: ${first.value} → ${last.period}: ${last.value}${units}.`;
       return {
         data: {
           productId: pid,
