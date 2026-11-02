@@ -35,6 +35,16 @@ describe('DownloadCache', () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it('invalidate() forces the next get to download again', async () => {
+    const fetch = vi.fn<FetchFn>(async () => new Response('<html>maintenance</html>'));
+    const { cache, dir } = await setup(fetch);
+    await cache.get('https://x.test/feed.zip', { ttlMs: 60_000, maxBytes: 1000, ext: '.zip' });
+    await cache.invalidate('https://x.test/feed.zip', '.zip');
+    expect(await readdir(dir)).toEqual([]);
+    await cache.get('https://x.test/feed.zip', { ttlMs: 60_000, maxBytes: 1000, ext: '.zip' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('re-downloads after the TTL', async () => {
     const fetch = vi.fn<FetchFn>(async () => new Response('x'));
     const { cache } = await setup(fetch);

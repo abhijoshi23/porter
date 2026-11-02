@@ -42,12 +42,16 @@ export class DownloadCache {
 
   constructor(private readonly opts: { dir: string; http: HttpClient; log: Logger }) {}
 
+  private pathFor(url: string, ext = ''): { key: string; path: string } {
+    const key = createHash('sha256').update(url).digest('hex').slice(0, 32);
+    return { key, path: join(this.opts.dir, `${key}${ext}`) };
+  }
+
   async get(
     url: string,
     o: { ttlMs: number; maxBytes: number; ext?: string; timeoutMs?: number },
   ): Promise<CachedFile> {
-    const key = createHash('sha256').update(url).digest('hex').slice(0, 32);
-    const path = join(this.opts.dir, `${key}${o.ext ?? ''}`);
+    const { key, path } = this.pathFor(url, o.ext);
     const fresh = await this.readFresh(path, o.ttlMs);
     if (fresh) return fresh;
 
@@ -56,6 +60,17 @@ export class DownloadCache {
     const p = this.download(url, path, o).finally(() => this.inflight.delete(key));
     this.inflight.set(key, p);
     return p;
+  }
+
+  /**
+   * Drops a cached file. Call it when a download turns out to be unusable (an HTML error
+   * page served with status 200, a truncated zip), so the next request fetches again
+   * instead of reusing the bad copy until the TTL runs out.
+   */
+  async invalidate(url: string, ext?: string): Promise<void> {
+    const { path } = this.pathFor(url, ext);
+    await rm(`${path}.meta.json`, { force: true });
+    await rm(path, { force: true });
   }
 
   private async readFresh(path: string, ttlMs: number): Promise<CachedFile | null> {
@@ -113,7 +128,14 @@ export class DownloadCache {
       this.opts.log.info({ url, bytes }, 'downloaded to cache');
       return { path, bytes, fetchedAt: new Date(meta.fetchedAt), contentType: meta.contentType };
     } catch (err) {
-      out.destroy();
+      // The stream opens its file asynchronously; if we abort early, the open can finish
+      // after an immediate rm() and leave the temp file behind. Wait for close first.
+      if (!out.closed) {
+        await new Promise<void>((r) => {
+          out.once('close', () => r());
+          out.destroy();
+        });
+      }
       await rm(tmp, { force: true });
       throw err;
     }
