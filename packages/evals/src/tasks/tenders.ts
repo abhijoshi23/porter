@@ -6,8 +6,9 @@ import { answer, answerNot, anyOf, called, defineTask, maxCalls, notCalled } fro
  * TBIPS notice and the ACAN keep their security level and kind after they close, so their
  * checks hold either way.
  */
+/** 2026-11-05, Nov 5, or 5 Nov. */
 const DATE =
-  /\b(20\d\d-\d\d-\d\d|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2})\b/i;
+  /\b(20\d\d-\d\d-\d\d|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}|\d{1,2} (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/i;
 const CITES = /CanadaBuys|Open Government Licen[cs]e/i;
 
 export const tenderTasks = [
@@ -30,7 +31,8 @@ export const tenderTasks = [
     intent: 'A closed notice asked about by solicitation number: must say it is closed',
     prompt: 'Is federal tender CIC-160477 still open? We want to put in a bid this week.',
     checks: [
-      called('get_tender', { id: /CIC-160477/i }, { result: /^Closed .*no longer accepted/ }),
+      // The answer checks judge honesty; result previews differ by driver (summary or JSON).
+      called('get_tender', { id: /CIC-160477/i }),
       answer(/\b(closed|no longer|expired|has passed|past)\b/i, 'answer says it is closed'),
       answerNot(/\bis (still )?open\b(?![^.]*\?)/i, 'answer does not call it open'),
       maxCalls(3),

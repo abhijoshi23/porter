@@ -47,6 +47,8 @@ Latest runs (2026-11-02), 14 tasks: 6 open data and 8 transit, against live data
 | qwen2.5-coder:7b (local) | Ollama                   | 50% (7/14)                | 3.9               | 0.36                |
 | Claude Haiku, baseline   | before eval-driven fixes | 86% (12/14)               | 3.4               | 0.71                |
 
+**Tenders suite** (2026-11-03, 6 tasks, Claude Haiku, 3 attempts each): **18/18**, 2.0 tool calls per task, no failed calls. The first run scored 12/18, and every failure was a check bug, not a model or server problem. The date check didn't accept "Thu 5 Nov", and the closed-notice check expected the summary line in a result preview that the Claude Code driver shows as JSON. After fixing the checks, re-scoring the saved traces and a fresh run both passed 18/18. Open item: for "DND tenders closing this week" the model pages through all 55 results (3 calls) instead of summarizing the first page.
+
 What changed between baseline and latest, and why, is in [tool-design.md](tool-design.md#changelog-tool-names-descriptions-and-how-eval-scores-moved). Reports with every failed check are in [`packages/evals/results/`](../packages/evals/results/).
 
 **Reading these numbers.** Fourteen tasks is a small suite: it shows where tools trip models up, not a benchmark. Live data changes between runs (a GO train may or may not be due within the hour), and pass rates for the same code varied between 93% and 98%. The local 7B model's failures are mostly model limits (repeated identical calls, skipped citations), which tool design can only partly offset.

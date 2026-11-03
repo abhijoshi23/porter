@@ -51,6 +51,14 @@ describe('tender eval checks', () => {
     expect(score(task('clearance-gap'), trace([without], answer)).pass).toBe(false);
   });
 
+  it('reads closing dates written day-first', () => {
+    const t = trace(
+      [call('search_tenders', { buyer: 'DND', closesWithinDays: 7 })],
+      'Closes Thu 5 Nov, 14:00 ET.',
+    );
+    expect(score(task('dnd-this-week'), t).pass).toBe(true);
+  });
+
   it('dnd-this-week accepts the acronym or the full name, within about a week', () => {
     const answer = 'Two close soon: 2026-11-04 and 2026-11-06.';
     for (const buyer of ['DND', 'Department of National Defence']) {
