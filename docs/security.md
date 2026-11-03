@@ -17,7 +17,7 @@ This document grows with each milestone.
 
 ## Prompt injection
 
-Dataset descriptions, StatCan footnotes and, later, tender documents are written by third parties, and anyone who can edit a catalogue entry can write "ignore previous instructions…". Porter's defences:
+Dataset descriptions, StatCan footnotes, transit alerts and tender notices are written by third parties, and anyone who can edit a catalogue entry can write "ignore previous instructions…". Porter's defences:
 
 | Layer                          | What it does                                                                                                                                                                                                                                                                  |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -60,6 +60,14 @@ Feeds are ZIP files from agency servers, read by a small built-in reader (`packa
 ### Realtime feeds
 
 GTFS-Realtime is decoded by a bounds-checked protobuf reader: every length is checked against the enclosing message, truncated or malformed input raises a normal error (tested against every truncation of a valid message), and unknown fields are skipped. Alert text is publisher-written, so it goes through `externalText()` like any other external text. A realtime feed older than `PORTER_TRANSIT_REALTIME_MAX_AGE_S` is reported as stale and ignored, never shown as live.
+
+### Tender files (`porter-tenders`)
+
+CanadaBuys CSVs are parsed by a one-pass state machine (`packages/server-tenders/src/csv.ts`), linear in the input with no regexes, so a hostile file can't trigger backtracking (tested on 1 MB of `""` pairs). A file without the expected tender-notice columns (an error page served with status 200) is rejected and dropped from the cache. If a refresh fails, the previous snapshot keeps serving with its real download time.
+
+Tender descriptions are long publisher text and the most likely injection carrier in Porter. Titles, descriptions, contacts and the evidence sentences quoted by `summarize_tender_fit` all pass through `externalText()`. Notice and document links must be absolute `http(s)` (`javascript:` and relative links are dropped). The fixture set includes a notice whose description carries an HTML-comment "assistant" marker, a `## SYSTEM` heading on its own line and a bidi override. The integration test checks that none of these survive and that summaries never repeat the text.
+
+That test found a toolkit bug: `externalText()` turned newlines into spaces before flattening headings, so only a heading on the first line was caught. Headings are now flattened while line breaks still exist.
 
 ## HTTP mode
 

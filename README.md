@@ -2,7 +2,7 @@
 
 **MCP servers that give AI assistants safe, well-designed access to Canadian public data, Ontario transit, federal tenders and small-business accounting.**
 
-> 🚧 Early development. The toolkit, the open-data and transit servers, and the eval runner are done. See the [roadmap](#roadmap).
+> 🚧 Early development. The toolkit, the open-data, transit and tenders servers, and the eval runner are done. See the [roadmap](#roadmap).
 
 Porter is a monorepo of [Model Context Protocol](https://modelcontextprotocol.io) servers built on a shared toolkit. It targets the **2026-07-28** MCP spec with the v2 TypeScript SDK, and it still serves 2025-era clients such as Claude Desktop.
 
@@ -19,7 +19,7 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 | [`porter-opendata`](packages/server-opendata)     | ✅           | Ontario, Toronto and federal CKAN plus StatCan                                                                    |
 | [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
 | [`porter-evals`](packages/evals)                  | ✅ (private) | Eval runner: Claude Code headless or Ollama drivers, deterministic checks, Markdown reports                       |
-| `porter-tenders`                                  | Milestone 5  | CanadaBuys tender search and fit summaries                                                                        |
+| [`porter-tenders`](packages/server-tenders)       | ✅           | CanadaBuys tender search, notice details and bid-fit summaries                                                    |
 | `porter-quickbooks`                               | Milestone 6  | QuickBooks Online sandbox, with confirmed writes                                                                  |
 
 ## Evals
@@ -42,6 +42,10 @@ The first run exposed two real bugs and five tool-design gaps; [tool-design.md](
 > **You:** What's the first train from Kitchener to Union after 6 a.m.?
 >
 > **Assistant** (via `plan_simple_trip`): The next direct GO train leaves **Kitchener GO at 06:07** and arrives at **Union Station at 07:47** (1 h 40 min). This is the published schedule: GO doesn't offer open live predictions. Source: GO Transit open data (Metrolinx).
+
+> **You:** Our team holds Reliability status. Could we bid on CanadaBuys tender cb-904-22970389?
+>
+> **Assistant** (via `summarize_tender_fit`): Probably not. The notice (TBIPS Tier 2, Stream 5: project management services) lists **Secret** clearance, above your Reliability status. It's open until **Wed 2026-12-02 at 14:00 ET**. The full security clauses are in the solicitation documents, so confirm there before deciding. Source: CanadaBuys, Open Government Licence – Canada.
 
 ## Toolkit at a glance
 
@@ -84,7 +88,7 @@ claude mcp add --transport stdio porter-hello -- node "$PWD/packages/server-hell
 2. ✅ Open data server
 3. ✅ Transit server
 4. ✅ Eval runner ([docs/evals.md](docs/evals.md))
-5. Tenders server
+5. ✅ Tenders server
 6. QuickBooks server
 7. Keel/Trillium adapters + remote deployment
 8. Publish to npm, the MCP Registry and `.mcpb` bundles
