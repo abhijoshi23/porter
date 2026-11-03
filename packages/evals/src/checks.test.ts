@@ -121,3 +121,15 @@ describe('runner and report', () => {
     expect(md).toContain('called find_stops (×1)');
   });
 });
+
+describe('report escaping', () => {
+  it('escapes backslashes before pipes so model text cannot break a table cell', async () => {
+    const task: Task = { id: 's/t', servers: [], prompt: '', intent: 'a\\|b', checks: [] };
+    const run = await runTasks({
+      tasks: [task],
+      driver: new ScriptedDriver({}),
+      cacheDir: '/tmp/x',
+    });
+    expect(toMarkdown(run, [task])).toContain('a\\\\\\|b');
+  });
+});

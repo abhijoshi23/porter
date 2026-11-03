@@ -61,7 +61,8 @@ export function summarize(run: RunResult): {
 }
 
 const pct = (n: number, d: number) => `${d ? Math.round((n / d) * 100) : 0}%`;
-const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+/** Table-cell safe: escape backslashes first, then pipes, so "\\|" can't end a cell. */
+const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 /** A Markdown report a reviewer can read on GitHub. */
 export function toMarkdown(run: RunResult, tasks: Task[]): string {
