@@ -37,7 +37,9 @@ export interface TendersOptions {
 
 export function createTendersServer(o: TendersOptions): ServerDefinition {
   const http = new HttpClient({
-    userAgent: `${NAME}/${VERSION} (+https://github.com/abhijoshi23/porter)`,
+    // Still names the tool and version, but without the "(+https://…)" contact link the
+    // other servers send: canadabuys.canada.ca answers 403 to that form (2026-11-03).
+    userAgent: `${NAME}/${VERSION}`,
     log: o.log,
     ...(o.fetch ? { fetch: o.fetch } : {}),
     rateLimit: { perSecond: 2, burst: 4 },
