@@ -9,6 +9,13 @@ updates:
         patterns: ['@modelcontextprotocol/*']
       dev-tooling:
         dependency-type: development
+    ignore:
+      # typescript-eslint doesn't support TS 7 yet; revisit when it does.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # Types must match the oldest supported runtime (engines: Node 22).
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
