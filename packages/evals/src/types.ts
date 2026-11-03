@@ -1,5 +1,5 @@
 /** Which Porter server a task needs. Each maps to a built binary (see servers.ts). */
-export type ServerId = 'opendata' | 'transit';
+export type ServerId = 'opendata' | 'transit' | 'tenders';
 
 export interface ToolCall {
   /** Bare tool name, e.g. `next_departures` (driver prefixes like `mcp__porter-transit__` are stripped). */

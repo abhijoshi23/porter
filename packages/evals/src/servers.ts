@@ -5,6 +5,7 @@ import type { ServerId, ServerLaunch } from './types.js';
 const PACKAGES: Record<ServerId, { pkg: string; name: string }> = {
   opendata: { pkg: '@abhijoshi23/porter-opendata', name: 'porter-opendata' },
   transit: { pkg: '@abhijoshi23/porter-transit', name: 'porter-transit' },
+  tenders: { pkg: '@abhijoshi23/porter-tenders', name: 'porter-tenders' },
 };
 
 /** The built `dist/bin.js` of a workspace server, found through its package entry point. */

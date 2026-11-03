@@ -205,6 +205,9 @@ importers:
       '@abhijoshi23/porter-opendata':
         specifier: workspace:*
         version: link:../server-opendata
+      '@abhijoshi23/porter-tenders':
+        specifier: workspace:*
+        version: link:../server-tenders
       '@abhijoshi23/porter-transit':
         specifier: workspace:*
         version: link:../server-transit
