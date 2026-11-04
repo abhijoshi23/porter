@@ -2,7 +2,7 @@
 
 **MCP servers that give AI assistants safe, well-designed access to Canadian public data, Ontario transit, federal tenders and small-business accounting.**
 
-> 🚧 Early development. The toolkit, the open-data, transit and tenders servers, and the eval runner are done. See the [roadmap](#roadmap).
+> 🚧 Early development. The toolkit, the open-data, transit, tenders and QuickBooks servers, and the eval runner are done. See the [roadmap](#roadmap).
 
 Porter is a monorepo of [Model Context Protocol](https://modelcontextprotocol.io) servers built on a shared toolkit. It targets the **2026-07-28** MCP spec with the v2 TypeScript SDK, and it still serves 2025-era clients such as Claude Desktop.
 
@@ -20,7 +20,7 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 | [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
 | [`porter-evals`](packages/evals)                  | ✅ (private) | Eval runner: Claude Code headless or Ollama drivers, deterministic checks, Markdown reports                       |
 | [`porter-tenders`](packages/server-tenders)       | ✅           | CanadaBuys tender search, notice details and bid-fit summaries                                                    |
-| `porter-quickbooks`                               | Milestone 6  | QuickBooks Online sandbox, with confirmed writes                                                                  |
+| [`porter-quickbooks`](packages/server-quickbooks) | ✅           | QuickBooks Online: receivables, P&L, invoices; writes only after the user approves (demo company built in)        |
 
 ## Evals
 
@@ -47,10 +47,14 @@ The first run exposed two real bugs and five tool-design gaps; [tool-design.md](
 >
 > **Assistant** (via `summarize_tender_fit`): Probably not. The notice (TBIPS Tier 2, Stream 5: project management services) lists **Secret** clearance, above your Reliability status. It's open until **Wed 2026-12-02 at 14:00 ET**. The full security clauses are in the solicitation documents, so confirm there before deciding. Source: CanadaBuys, Open Government Licence – Canada.
 
+> **You:** Invoice Amy's Bird Sanctuary for 3 hours of design.
+>
+> **Assistant** (via `create_invoice`; Claude Code shows the approval prompt): Here's the invoice: Design, 3 × $75.00 = **$225.00**, before any sales tax, dated today and due on Amy's usual terms. It won't be emailed. Shall I create it? _(Nothing exists in QuickBooks until you say yes.)_
+
 ## Toolkit at a glance
 
 - **Both protocol eras**: stateless 2026-07-28, plus the 2025 `initialize` handshake for older clients. Every integration test runs under both.
-- **Safe by default**: tools are read-only unless they opt out. Errors become model-readable `isError` results with hints, and internals never leak.
+- **Safe by default**: tools are read-only unless they opt out, and writes need the user's approval (elicitation in both protocol eras, or a signed preview token: `askUser`, `ConfirmationTokens`). Errors become model-readable `isError` results with hints, and internals never leak.
 - **Context-friendly**: opaque cursors, plus hard row and byte caps with "refine your query" hints.
 - **Resilient upstream calls**: per-host token-bucket rate limiting, timeouts, jittered retries that honour `Retry-After`.
 - **DNS-rebinding protection** in HTTP mode (`Host`/`Origin` validation).
@@ -89,7 +93,7 @@ claude mcp add --transport stdio porter-hello -- node "$PWD/packages/server-hell
 3. ✅ Transit server
 4. ✅ Eval runner ([docs/evals.md](docs/evals.md))
 5. ✅ Tenders server
-6. QuickBooks server
+6. ✅ QuickBooks server ([ADR-004](docs/adr/004-write-confirmation.md): confirming writes)
 7. Keel/Trillium adapters + remote deployment
 8. Publish to npm, the MCP Registry and `.mcpb` bundles
 
