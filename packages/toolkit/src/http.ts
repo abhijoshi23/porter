@@ -26,6 +26,11 @@ export interface RequestOptions {
   body?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Return non-2xx responses (after retries) instead of throwing, for APIs whose error
+   * bodies say what was wrong (QuickBooks validation faults).
+   */
+  returnErrors?: boolean;
 }
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -94,6 +99,7 @@ export class HttpClient {
         await this.backoff(attempt, res.headers.get('retry-after'), u, `HTTP ${res.status}`);
         continue;
       }
+      if (ro.returnErrors) return res;
       await res.body?.cancel();
       throw new UpstreamError(u.host, res.status);
     }

@@ -76,6 +76,18 @@ describe('HttpClient', () => {
     expect(err.hint).toMatch(/search again/);
   });
 
+  it('hands back error responses when asked, after retrying', async () => {
+    const fetch = vi
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(json({}, 503))
+      .mockResolvedValueOnce(json({ Fault: { type: 'ValidationFault' } }, 400));
+    const { http } = client(fetch);
+    const res = await http.request('https://api.test/x', { returnErrors: true });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ Fault: { type: 'ValidationFault' } });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('never retries non-idempotent methods', async () => {
     const fetch = vi.fn<FetchFn>(async () => json({}, 503));
     const { http } = client(fetch);
