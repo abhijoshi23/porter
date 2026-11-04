@@ -6,6 +6,7 @@ const PACKAGES: Record<ServerId, { pkg: string; name: string }> = {
   opendata: { pkg: '@abhijoshi23/porter-opendata', name: 'porter-opendata' },
   transit: { pkg: '@abhijoshi23/porter-transit', name: 'porter-transit' },
   tenders: { pkg: '@abhijoshi23/porter-tenders', name: 'porter-tenders' },
+  quickbooks: { pkg: '@abhijoshi23/porter-quickbooks', name: 'porter-quickbooks' },
 };
 
 /** The built `dist/bin.js` of a workspace server, found through its package entry point. */
@@ -28,6 +29,8 @@ export function serverLaunches(ids: ServerId[], o: { cacheDir: string }): Server
       LOG_LEVEL: 'silent',
       PORTER_CACHE_DIR: o.cacheDir,
       PORTER_TRANSIT_BUILD_WAIT_MS: '180000',
+      // The built-in sample company: no Intuit account, fixed figures to check against.
+      QUICKBOOKS_ENVIRONMENT: 'demo',
     },
   }));
 }

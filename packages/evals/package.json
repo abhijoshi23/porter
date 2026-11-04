@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@abhijoshi23/porter-opendata": "workspace:*",
+    "@abhijoshi23/porter-quickbooks": "workspace:*",
     "@abhijoshi23/porter-tenders": "workspace:*",
     "@abhijoshi23/porter-transit": "workspace:*",
     "@modelcontextprotocol/client": "2.4.0",

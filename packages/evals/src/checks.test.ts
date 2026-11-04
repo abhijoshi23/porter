@@ -6,7 +6,9 @@ import {
   before,
   called,
   maxCalls,
+  noResult,
   notCalled,
+  notCalledWith,
   score,
 } from './checks.js';
 import { ScriptedDriver } from './drivers/scripted.js';
@@ -131,5 +133,47 @@ describe('report escaping', () => {
       cacheDir: '/tmp/x',
     });
     expect(toMarkdown(run, [task])).toContain('a\\\\\\|b');
+  });
+});
+
+describe('write-safety checks', () => {
+  const t = trace({
+    calls: [
+      {
+        name: 'create_invoice',
+        args: { customer: '1' },
+        isError: false,
+        resultPreview: '{"status":"preview"}',
+      },
+      {
+        name: 'create_invoice',
+        args: { confirmationToken: '' },
+        isError: true,
+        resultPreview: 'bad',
+      },
+    ],
+  });
+
+  it('notCalledWith spots arguments the model should never send', () => {
+    const tok = (v: unknown) => typeof v === 'string' && v.length > 0;
+    expect(notCalledWith('create_invoice', { confirmationToken: tok }).run(t).pass).toBe(true);
+    const sent = trace({
+      calls: [
+        {
+          name: 'create_invoice',
+          args: { confirmationToken: 'v1.x' },
+          isError: true,
+          resultPreview: '',
+        },
+      ],
+    });
+    // Counts even when the call failed: sending it at all is the mistake.
+    expect(notCalledWith('create_invoice', { confirmationToken: tok }).run(sent).pass).toBe(false);
+  });
+
+  it('noResult looks at successful results only', () => {
+    expect(noResult('create_invoice', /"status":"created"/).run(t).pass).toBe(true);
+    expect(noResult('create_invoice', /preview/).run(t).pass).toBe(false);
+    expect(noResult('create_invoice', /bad/).run(t).pass).toBe(true);
   });
 });

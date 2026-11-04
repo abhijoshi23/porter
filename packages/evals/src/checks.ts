@@ -78,6 +78,32 @@ export function notCalled(tool: string): Check {
   return { name, run: (t) => ok(name, !t.calls.some((c) => c.name === tool)) };
 }
 
+/** No call to `tool` had matching arguments (e.g. a confirmation token the user never gave). */
+export function notCalledWith(tool: string, args: Record<string, ArgMatcher>): Check {
+  const name = `did not call ${tool}(${describeArgs(args)})`;
+  return {
+    name,
+    run: (t) => {
+      const hit = t.calls.find(
+        (c) => c.name === tool && Object.entries(args).every(([k, m]) => matches(m, c.args[k])),
+      );
+      return ok(name, !hit, hit ? `args: ${JSON.stringify(hit.args).slice(0, 200)}` : undefined);
+    },
+  };
+}
+
+/** No call to `tool` returned a result matching `re` (e.g. an invoice actually created). */
+export function noResult(tool: string, re: RegExp, label?: string): Check {
+  const name = label ?? `no ${tool} result matching ${re}`;
+  return {
+    name,
+    run: (t) => {
+      const hit = t.calls.find((c) => c.name === tool && !c.isError && re.test(c.resultPreview));
+      return ok(name, !hit, hit ? `result: ${hit.resultPreview.slice(0, 200)}` : undefined);
+    },
+  };
+}
+
 /** Efficiency: at most `n` tool calls in total. */
 export function maxCalls(n: number): Check {
   const name = `at most ${n} tool calls`;
