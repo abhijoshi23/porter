@@ -12,7 +12,7 @@
  *    headings, HTML comments and zero-width characters.
  *
  * None of this makes injection impossible; it reduces the attack surface. Write tools
- * also require human confirmation (Milestone 6), so injected text cannot cause side
+ * also require human confirmation (`confirm.ts`), so injected text cannot cause side
  * effects on its own.
  */
 export const EXTERNAL_CONTENT_NOTICE =

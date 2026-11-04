@@ -6,7 +6,7 @@ import { connectTestClient, ERAS, type TestClient } from '@abhijoshi23/porter-to
 import { afterEach, describe, expect, it } from 'vitest';
 import { definition, getCity, listCities } from './server.js';
 
-const ctx = { log: silentLogger, mcp: {} as never };
+const ctx = { log: silentLogger, mcp: {} as never, legacyClientCapabilities: () => undefined };
 
 describe('list_cities (unit)', () => {
   it('filters by region, case-insensitively', async () => {

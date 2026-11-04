@@ -3,7 +3,12 @@ import {
   InMemoryTransport,
   StreamableHTTPClientTransport,
 } from '@modelcontextprotocol/client';
-import { createMcpHandler, type McpServer } from '@modelcontextprotocol/server';
+import {
+  createMcpHandler,
+  type ElicitRequestFormParams,
+  type ElicitResult,
+  type McpServer,
+} from '@modelcontextprotocol/server';
 
 /**
  * The two protocol eras a Porter server must serve:
@@ -33,11 +38,37 @@ export interface TestClient {
  *   Streamable HTTP transport as its `fetch`. Real HTTP semantics (headers, status codes,
  *   JSON/SSE bodies) without a network, and it is the exact handler we deploy.
  */
-export async function connectTestClient(factory: () => McpServer, era: Era): Promise<TestClient> {
+export interface TestClientOptions {
+  /**
+   * Plays the user answering an elicitation (a write confirmation). When set, the client
+   * declares form elicitation support; without it, the client says it can't elicit.
+   */
+  onElicit?: (params: ElicitRequestFormParams) => ElicitResult | Promise<ElicitResult>;
+}
+
+function makeClient(opts: TestClientOptions, extra: ConstructorParameters<typeof Client>[1] = {}) {
+  const client = new Client(
+    { name: 'porter-test', version: '0.0.0' },
+    { ...extra, ...(opts.onElicit ? { capabilities: { elicitation: { form: {} } } } : {}) },
+  );
+  const onElicit = opts.onElicit;
+  if (onElicit) {
+    client.setRequestHandler('elicitation/create', async (req) =>
+      onElicit(req.params as ElicitRequestFormParams),
+    );
+  }
+  return client;
+}
+
+export async function connectTestClient(
+  factory: () => McpServer,
+  era: Era,
+  opts: TestClientOptions = {},
+): Promise<TestClient> {
   if (era === '2025') {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const server = factory();
-    const client = new Client({ name: 'porter-test', version: '0.0.0' });
+    const client = makeClient(opts);
     await server.connect(serverTransport);
     await client.connect(clientTransport);
     return {
@@ -53,12 +84,9 @@ export async function connectTestClient(factory: () => McpServer, era: Era): Pro
   const transport = new StreamableHTTPClientTransport(new URL('http://porter.test/mcp'), {
     fetch: (input, init) => handler.fetch(new Request(input, init)),
   });
-  const client = new Client(
-    { name: 'porter-test', version: '0.0.0' },
-    // Pin the modern era. With `legacy: 'reject'` on the handler, any silent fallback to
-    // 2025 would fail loudly instead of quietly testing the wrong path.
-    { versionNegotiation: { mode: { pin: '2026-07-28' } } },
-  );
+  // Pin the modern era. With `legacy: 'reject'` on the handler, any silent fallback to
+  // 2025 would fail loudly instead of quietly testing the wrong path.
+  const client = makeClient(opts, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
   await client.connect(transport);
   return {
     client,

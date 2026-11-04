@@ -1,4 +1,11 @@
-import type { McpServer, ServerContext, ToolAnnotations } from '@modelcontextprotocol/server';
+import {
+  isInputRequiredResult,
+  type ClientCapabilities,
+  type InputRequiredResult,
+  type McpServer,
+  type ServerContext,
+  type ToolAnnotations,
+} from '@modelcontextprotocol/server';
 import type * as z from 'zod/v4';
 import { toToolErrorResult } from './errors.js';
 import type { Logger } from './logger.js';
@@ -8,8 +15,8 @@ import type { Logger } from './logger.js';
  *
  * Annotations are *hints* for the client UI (for example, whether to show a confirmation
  * prompt). The SDK does not enforce them, and the spec tells clients not to trust them
- * from untrusted servers. Real safety for write tools lives in the handler: dryRun plus
- * confirmation (Milestone 6).
+ * from untrusted servers. Real safety for write tools lives in the handler: a preview plus
+ * confirmation (`confirm.ts`).
  */
 const DEFAULT_ANNOTATIONS: Required<
   Pick<ToolAnnotations, 'readOnlyHint' | 'destructiveHint' | 'idempotentHint' | 'openWorldHint'>
@@ -25,6 +32,8 @@ export interface ToolContext {
   log: Logger;
   /** The SDK's per-request context (auth info, HTTP request, MRTR input responses). */
   mcp: ServerContext;
+  /** What a 2025-era client declared at initialize. Use `clientCapabilities(ctx)`, which covers both eras. */
+  legacyClientCapabilities: () => ClientCapabilities | undefined;
 }
 
 export interface ToolOutput<O> {
@@ -37,6 +46,8 @@ export interface ToolOutput<O> {
 export interface ToolDefinition<
   I extends z.ZodObject = z.ZodObject,
   O extends z.ZodObject = z.ZodObject,
+  R extends ToolOutput<z.output<O>> | InputRequiredResult =
+    ToolOutput<z.output<O>> | InputRequiredResult,
 > {
   name: string;
   title: string;
@@ -45,16 +56,23 @@ export interface ToolDefinition<
   input: I;
   output: O;
   annotations?: Partial<ToolAnnotations>;
-  handler: (args: z.output<I>, ctx: ToolContext) => Promise<ToolOutput<z.output<O>>>;
+  /**
+   * Returns the result, or (write tools on 2026-07-28 clients) an `input_required` result
+   * from `askUser` so the client asks the user and calls again.
+   */
+  handler: (args: z.output<I>, ctx: ToolContext) => Promise<R>;
 }
 
 /**
  * Identity function that keeps the generic types tied together, so `handler` is checked
- * against `input` and `output`.
+ * against `input` and `output`. `R` is inferred: a read-only tool's handler is typed as
+ * returning plain `ToolOutput`, so tests can call it and read `.data` directly.
  */
-export function defineTool<I extends z.ZodObject, O extends z.ZodObject>(
-  def: ToolDefinition<I, O>,
-): ToolDefinition<I, O> {
+export function defineTool<
+  I extends z.ZodObject,
+  O extends z.ZodObject,
+  R extends ToolOutput<z.output<O>> | InputRequiredResult = ToolOutput<z.output<O>>,
+>(def: ToolDefinition<I, O, R>): ToolDefinition<I, O, R> {
   return def;
 }
 
@@ -73,7 +91,16 @@ export function registerTool(server: McpServer, tool: ToolDefinition, log: Logge
     async (args, mcp) => {
       const started = performance.now();
       try {
-        const { data, summary } = await tool.handler(args, { log: toolLog, mcp });
+        const out = await tool.handler(args, {
+          log: toolLog,
+          mcp,
+          legacyClientCapabilities: () => server.server.getClientCapabilities(),
+        });
+        if (isInputRequiredResult(out)) {
+          toolLog.info({ ms: Math.round(performance.now() - started) }, 'tool needs input');
+          return out;
+        }
+        const { data, summary } = out;
         toolLog.info({ ms: Math.round(performance.now() - started) }, 'tool ok');
         return {
           // Many clients (including Claude Code today) put only `content` into the model's

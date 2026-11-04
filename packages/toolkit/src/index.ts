@@ -1,5 +1,6 @@
 export * from './cache.js';
 export * from './config.js';
+export * from './confirm.js';
 export * from './define-tool.js';
 export * from './errors.js';
 export * from './http.js';
