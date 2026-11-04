@@ -205,6 +205,9 @@ importers:
       '@abhijoshi23/porter-opendata':
         specifier: workspace:*
         version: link:../server-opendata
+      '@abhijoshi23/porter-quickbooks':
+        specifier: workspace:*
+        version: link:../server-quickbooks
       '@abhijoshi23/porter-tenders':
         specifier: workspace:*
         version: link:../server-tenders
@@ -239,6 +242,22 @@ importers:
       '@duckdb/node-api':
         specifier: 2.0.0-r.1
         version: 2.0.0-r.1
+      '@modelcontextprotocol/server':
+        specifier: 2.4.0
+        version: 2.4.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.4.0
+        version: 2.4.0
+
+  packages/server-quickbooks:
+    dependencies:
+      '@abhijoshi23/porter-toolkit':
+        specifier: workspace:*
+        version: link:../toolkit
       '@modelcontextprotocol/server':
         specifier: 2.4.0
         version: 2.4.0
