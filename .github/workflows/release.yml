@@ -26,11 +26,11 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      # v2 takes the token as an input, and npm auth comes from setup-node's registry-url
+      # v2 takes the token as an input, renames publish to publish-script, and npm auth comes from setup-node's registry-url
       # plus NODE_AUTH_TOKEN (v2 no longer writes .npmrc from NPM_TOKEN).
       - uses: changesets/action@v2
         with:
-          publish: pnpm release
+          publish-script: pnpm release
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
