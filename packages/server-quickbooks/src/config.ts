@@ -34,12 +34,13 @@ export const configSchema = baseConfigSchema.extend({
    */
   PORTER_CONFIRM_SECRET: z.string().min(32).optional(),
   /**
-   * `true`: refuse writes from clients that can't ask the user themselves (elicitation),
-   * instead of falling back to preview-then-confirm-token.
+   * `true` (default): refuse writes from clients that can't ask the user themselves
+   * (elicitation). `false`: fall back to preview-then-confirm-token, where approval rests on
+   * the model following instructions plus the client's own tool-approval prompt (ADR-004).
    */
   QUICKBOOKS_REQUIRE_ELICITATION: z
     .enum(['true', 'false'])
-    .default('false')
+    .default('true')
     .transform((v) => v === 'true'),
 });
 

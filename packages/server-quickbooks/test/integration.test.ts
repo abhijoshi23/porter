@@ -18,6 +18,8 @@ const text = (r: Result) => (r.content as { text: string }[])[0]!.text;
 const summaryLine = (r: Result) => text(r).split('\n\n')[0]!;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const data = (r: Result) => r.structuredContent as any;
+/** Opt in to preview-then-token writes for clients without elicitation (off by default). */
+const TOKEN_FALLBACK = { QUICKBOOKS_REQUIRE_ELICITATION: 'false' };
 
 let state: FakeState;
 let dir: string;
@@ -260,7 +262,7 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
     };
 
     it('without elicitation: previews with a token, creates on the confirmed call, once', async () => {
-      const first = await call('create_invoice', args);
+      const first = await call('create_invoice', args, {}, TOKEN_FALLBACK);
       expect(first.isError).toBeFalsy();
       const p = data(first);
       expect(p.status).toBe('preview');
@@ -293,7 +295,7 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
     });
 
     it('rejects a token used for a different invoice', async () => {
-      const p = data(await call('create_invoice', args));
+      const p = data(await call('create_invoice', args, {}, TOKEN_FALLBACK));
       const r = await call('create_invoice', {
         ...args,
         lines: [{ item: 'Design', quantity: 30 }],
@@ -339,10 +341,32 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
       expect(state.calls.create).toBe(0);
     });
 
-    it('can refuse clients that cannot ask the user', async () => {
-      const r = await call('create_invoice', args, {}, { QUICKBOOKS_REQUIRE_ELICITATION: 'true' });
+    it('refuses clients that cannot ask the user by default, and says how to opt in', async () => {
+      const r = await call('create_invoice', args);
       expect(r.isError).toBe(true);
-      expect(text(r)).toMatch(/cannot ask the user/);
+      expect(text(r)).toMatch(/Nothing was created: this client cannot ask the user/);
+      expect(text(r)).toContain('QUICKBOOKS_REQUIRE_ELICITATION=false');
+      expect(text(r)).not.toContain('confirmationToken"');
+      expect(state.calls.create).toBe(0);
+    });
+
+    it('refuses by default even when the model sends a token', async () => {
+      const r = await call('create_invoice', { ...args, confirmationToken: 'v1.x.y.z' });
+      expect(r.isError).toBe(true);
+      expect(state.calls.create).toBe(0);
+    });
+
+    it('describes the token flow only when the fallback is on', async () => {
+      const describe = async (env: Record<string, string>) => {
+        const c = await connectTestClient(await connect(env), era);
+        const tools = await c.client.listTools();
+        await c.close();
+        return tools.tools.find((x) => x.name === 'create_invoice')!.description!;
+      };
+      const strict = await describe({});
+      expect(strict).not.toMatch(/confirmationToken/);
+      expect(strict).not.toMatch(/Amy|Design/);
+      expect(await describe(TOKEN_FALLBACK)).toMatch(/confirmationToken/);
     });
 
     it('asks which customer when a name is ambiguous', async () => {
@@ -363,7 +387,12 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
     it('needs a tax code in a Canadian company, and passes it on every line', async () => {
       state.country = 'CA';
       state.currency = 'CAD';
-      const r = await call('create_invoice', { customer: '3', lines: [{ item: 'Design' }] });
+      const r = await call(
+        'create_invoice',
+        { customer: '3', lines: [{ item: 'Design' }] },
+        {},
+        TOKEN_FALLBACK,
+      );
       expect(r.isError).toBe(true);
       expect(text(r)).toContain('HST ON [id:3]');
       const p = data(
@@ -387,7 +416,14 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
 
     it('shows QuickBooks validation errors to the model', async () => {
       state.items.push({ Id: '9', Name: 'Ghost', Type: 'Service', UnitPrice: 1, Active: true });
-      const p = data(await call('create_invoice', { customer: '3', lines: [{ item: 'Ghost' }] }));
+      const p = data(
+        await call(
+          'create_invoice',
+          { customer: '3', lines: [{ item: 'Ghost' }] },
+          {},
+          TOKEN_FALLBACK,
+        ),
+      );
       state.items.pop();
       const r = await call('create_invoice', {
         customer: '3',

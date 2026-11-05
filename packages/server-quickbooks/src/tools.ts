@@ -718,12 +718,16 @@ const createInvoice = (d: ToolDeps) =>
   defineTool({
     name: 'create_invoice',
     title: 'Create invoice (asks the user first)',
+    // No concrete example here: a write tool's example is a ready-made call, and small models
+    // have run it verbatim on unrelated requests (qwen2.5-coder 14b eval, 2026-11-05).
     description:
-      'Creates an invoice in QuickBooks. Nothing is created until the user approves: clients that can ask the user show them the invoice; ' +
-      'otherwise the first call returns `status: "preview"` and a `confirmationToken`. Show the user that preview, and only after they say yes ' +
-      "call again with the same arguments plus `confirmationToken`. Never pass a token the user hasn't approved. " +
-      'The invoice is not emailed. Customer and items must already exist (find_customers, find_items). ' +
-      'Example: { "customer": "Amy\'s Bird Sanctuary", "lines": [{ "item": "Design", "quantity": 3 }] }.',
+      'Creates an invoice in QuickBooks, only when the user has asked for one. Nothing is created until the user approves: ' +
+      (d.requireElicitation
+        ? 'the client shows them the invoice and asks. Clients that cannot ask the user are refused. '
+        : 'clients that can ask the user show them the invoice; otherwise the first call returns `status: "preview"` and a `confirmationToken`. ' +
+          "Show the user that preview, and only after they say yes call again with the same arguments plus `confirmationToken`. Never pass a token the user hasn't approved. ") +
+      'The invoice is not emailed. Customer and items must already exist (find_customers, find_items); if a name matches several, ask the user which. ' +
+      'Shape: { "customer": "<customer id>", "lines": [{ "item": "<item id>", "quantity": <number> }] }.',
     input: z.object({
       customer: z.string().min(1).max(100).describe('Customer id (preferred) or exact name.'),
       lines: z
@@ -825,9 +829,11 @@ const createInvoice = (d: ToolDeps) =>
       } else {
         if (d.requireElicitation) {
           throw new PorterError(
-            'This client cannot ask the user to approve the invoice, and the server is set to require that (QUICKBOOKS_REQUIRE_ELICITATION).',
+            'Nothing was created: this client cannot ask the user to approve the invoice, and the server requires that (QUICKBOOKS_REQUIRE_ELICITATION, on by default).',
             {
-              hint: 'Tell the user to create it in QuickBooks directly, or use a client that supports elicitation.',
+              hint:
+                'Tell the user to create it in QuickBooks directly, use a client that supports elicitation, or set QUICKBOOKS_REQUIRE_ELICITATION=false ' +
+                "to allow preview-and-confirm instead. Don't retry.",
             },
           );
         }

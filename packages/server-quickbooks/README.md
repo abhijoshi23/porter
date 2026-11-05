@@ -13,7 +13,7 @@ Try it with no Intuit account: `QUICKBOOKS_ENVIRONMENT=demo` serves a built-in s
 | `find_invoices`   | List invoices by customer, status and date, or open one by number with its lines                                | "What's on invoice 1037? Is it paid?"               |
 | `find_customers`  | Look up customers by name, with balance and email                                                               | "What does Amy's Bird Sanctuary owe?"               |
 | `find_items`      | Look up products and services with their default prices                                                         | "What do we charge for design?"                     |
-| `create_invoice`  | Create an invoice, **after the user approves it**. It is not emailed to the customer                            | "Invoice Amy for 3 hours of design"                 |
+| `create_invoice`  | Create an invoice, **after the user approves it** (needs a client with elicitation by default). Not emailed     | "Invoice Amy for 3 hours of design"                 |
 
 The tools can't email, record payments, edit or delete anything.
 
@@ -26,7 +26,8 @@ The model can put anything in a tool call, including `confirm: true`, so a flag 
 1. **The client asks the user** (MCP elicitation). The user sees the invoice in the client's own UI and approves or declines; the model never sees the question and can't answer it.
    - 2026-07-28 clients: the tool returns `input_required`, the client asks, then calls again with the answer. The answer is bound to that exact invoice with a signed `requestState`, so if a price changes between the two rounds the user is asked again.
    - 2025 clients: the server sends `elicitation/create` during the call and waits.
-2. **Otherwise, preview then token.** The first call returns `status: "preview"` and a signed `confirmationToken` that lasts 10 minutes and matches only that invoice. The model is told to show the preview and call again with the token only after the user says yes. The token can't prove a person looked: it proves the invoice created is exactly the one previewed, and the client's own tool-approval prompt is the human check. To refuse this fallback, set `QUICKBOOKS_REQUIRE_ELICITATION=true`.
+2. **Otherwise, refuse (the default).** A client that can't ask the user gets an error, and nothing is created. Reading the books still works.
+3. **Opt-in fallback: preview, then token** (`QUICKBOOKS_REQUIRE_ELICITATION=false`). The first call returns `status: "preview"` and a signed `confirmationToken` that lasts 10 minutes and matches only that invoice. The model is told to show the preview and call again with the token only after the user says yes. The token can't prove a person looked. It proves the invoice created is exactly the one previewed, and the human check is the client's own tool-approval prompt. **Only turn this on if your client asks you before every `create_invoice` call.** In our evals, a small local model (qwen2.5-coder 14b) reused the token by itself in 9 of 21 attempts. Claude Haiku, on the elicitation path, never did.
 
 Every create sends Intuit a `requestid` derived from the approval, so a retry after a dropped connection returns the same invoice instead of a duplicate. See [ADR-004](../../docs/adr/004-write-confirmation.md).
 
@@ -99,7 +100,7 @@ Alternative to step 4: get a refresh token from Intuit's [OAuth 2.0 Playground](
 | `QUICKBOOKS_CLIENT_SECRET`       |                                  | From your Intuit app; also derives the file encryption key                           |
 | `QUICKBOOKS_ENVIRONMENT`         | `sandbox`                        | `sandbox`, `production` or `demo` (built-in sample company, nothing saved)           |
 | `QUICKBOOKS_REDIRECT_URI`        | `http://localhost:8723/callback` | Must match the app's redirect URI                                                    |
-| `QUICKBOOKS_REQUIRE_ELICITATION` | `false`                          | `true`: refuse writes from clients that can't ask the user themselves                |
+| `QUICKBOOKS_REQUIRE_ELICITATION` | `true`                           | `false`: allow preview-then-token writes from clients that can't ask the user        |
 | `PORTER_TIMEZONE`                | `America/Toronto`                | The business's time zone, for "today" and "overdue"                                  |
 | `PORTER_CONFIRM_SECRET`          | random per process               | Signs confirmations; set it (32+ characters) when several processes serve one client |
 | `PORTER_CONFIG_DIR`              | `~/.config/porter`               | Where the encrypted connection is kept                                               |
