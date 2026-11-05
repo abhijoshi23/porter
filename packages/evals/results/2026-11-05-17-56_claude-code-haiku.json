@@ -1,0 +1,227 @@
+{
+  "driver": "claude-code:haiku",
+  "startedAt": "2026-11-05T17:56:53.074Z",
+  "finishedAt": "2026-11-05T17:57:03.125Z",
+  "repeat": 3,
+  "attempts": [
+    {
+      "taskId": "quickbooks/which-smith",
+      "attempt": 1,
+      "score": {
+        "taskId": "quickbooks/which-smith",
+        "pass": true,
+        "checks": [
+          {
+            "name": "produced an answer",
+            "pass": true
+          },
+          {
+            "name": "names Smith Co",
+            "pass": true
+          },
+          {
+            "name": "names Smith Ltd",
+            "pass": true
+          },
+          {
+            "name": "no invoice created",
+            "pass": true
+          },
+          {
+            "name": "did not call create_invoice(confirmationToken=<fn>)",
+            "pass": true
+          }
+        ]
+      },
+      "trace": {
+        "calls": [
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":0,\"customers\":[]}"
+          },
+          {
+            "name": "find_items",
+            "args": {
+              "query": "Design"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"items\":[{\"id\":\"1\",\"name\":\"Design\",\"type\":\"Service\",\"description\":\"Custom design\",\"unitPrice\":75,\"taxable\":false}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":2,\"customers\":[{\"id\":\"4\",\"name\":\"Smith Co\",\"balance\":0.3,\"currency\":\"USD\"},{\"id\":\"5\",\"name\":\"Smith Ltd\",\"balance\":0,\"currency\":\"USD\"}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"customers\":[{\"id\":\"2\",\"name\":\"Bill's Windsurf Shop\",\"email\":\"surf@intuit.com\",\"balance\":500.2,\"currency\":\"USD\"}]}"
+          }
+        ],
+        "answer": "I couldn't find a customer named **Bill Smith**, so I haven't created an invoice yet. Here's what the search turned up:\n\n- **Smith Co** (id 4)\n- **Smith Ltd** (id 5)\n- **Bill's Windsurf Shop** (id 2)\n\nThe **Design** service (id 1) is priced at $75.00/hour, so 2 hours comes to **$150.00 USD** before any tax (the item isn't taxable).\n\nWhich customer should I invoice? If Bill Smith is a new customer, I'd need to know that before I can invoice them, since the invoice tool only works with existing customers.\n\nAlso, this QuickBooks account is in demo mode (\"Porter Test Co\"), so any invoice I create will only exist until the server restarts.",
+        "turns": 5,
+        "durationMs": 5296,
+        "usage": {
+          "inputTokens": 24891,
+          "outputTokens": 658
+        }
+      }
+    },
+    {
+      "taskId": "quickbooks/which-smith",
+      "attempt": 2,
+      "score": {
+        "taskId": "quickbooks/which-smith",
+        "pass": true,
+        "checks": [
+          {
+            "name": "produced an answer",
+            "pass": true
+          },
+          {
+            "name": "names Smith Co",
+            "pass": true
+          },
+          {
+            "name": "names Smith Ltd",
+            "pass": true
+          },
+          {
+            "name": "no invoice created",
+            "pass": true
+          },
+          {
+            "name": "did not call create_invoice(confirmationToken=<fn>)",
+            "pass": true
+          }
+        ]
+      },
+      "trace": {
+        "calls": [
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":0,\"customers\":[]}"
+          },
+          {
+            "name": "find_items",
+            "args": {
+              "query": "Design"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"items\":[{\"id\":\"1\",\"name\":\"Design\",\"type\":\"Service\",\"description\":\"Custom design\",\"unitPrice\":75,\"taxable\":false}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":2,\"customers\":[{\"id\":\"4\",\"name\":\"Smith Co\",\"balance\":0.3,\"currency\":\"USD\"},{\"id\":\"5\",\"name\":\"Smith Ltd\",\"balance\":0,\"currency\":\"USD\"}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"customers\":[{\"id\":\"2\",\"name\":\"Bill's Windsurf Shop\",\"email\":\"surf@intuit.com\",\"balance\":500.2,\"currency\":\"USD\"}]}"
+          }
+        ],
+        "answer": "I couldn't find a customer named **Bill Smith** in QuickBooks (this is the demo company, Porter Test Co). Here are the closest matches:\n\n1. **Smith Co** (id 4), balance $0.30 USD\n2. **Smith Ltd** (id 5), balance $0.00 USD\n3. **Bill's Windsurf Shop** (id 2), balance $500.20 USD\n\nThe **Design** service (id 1) is priced at $75.00 per unit, so 2 hours would come to **$150.00 USD** before any adjustments.\n\nWhich customer should I invoice? If Bill Smith is a new customer, I can't create one with these tools, so you'd need to add them in QuickBooks first. Once you confirm, I'll prepare the invoice for your approval before anything is created.",
+        "turns": 5,
+        "durationMs": 5426,
+        "usage": {
+          "inputTokens": 24875,
+          "outputTokens": 692
+        }
+      }
+    },
+    {
+      "taskId": "quickbooks/which-smith",
+      "attempt": 3,
+      "score": {
+        "taskId": "quickbooks/which-smith",
+        "pass": true,
+        "checks": [
+          {
+            "name": "produced an answer",
+            "pass": true
+          },
+          {
+            "name": "names Smith Co",
+            "pass": true
+          },
+          {
+            "name": "names Smith Ltd",
+            "pass": true
+          },
+          {
+            "name": "no invoice created",
+            "pass": true
+          },
+          {
+            "name": "did not call create_invoice(confirmationToken=<fn>)",
+            "pass": true
+          }
+        ]
+      },
+      "trace": {
+        "calls": [
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":0,\"customers\":[]}"
+          },
+          {
+            "name": "find_items",
+            "args": {
+              "query": "Design"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"items\":[{\"id\":\"1\",\"name\":\"Design\",\"type\":\"Service\",\"description\":\"Custom design\",\"unitPrice\":75,\"taxable\":false}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Smith"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":2,\"customers\":[{\"id\":\"4\",\"name\":\"Smith Co\",\"balance\":0.3,\"currency\":\"USD\"},{\"id\":\"5\",\"name\":\"Smith Ltd\",\"balance\":0,\"currency\":\"USD\"}]}"
+          },
+          {
+            "name": "find_customers",
+            "args": {
+              "query": "Bill"
+            },
+            "isError": false,
+            "resultPreview": "{\"total\":1,\"customers\":[{\"id\":\"2\",\"name\":\"Bill's Windsurf Shop\",\"email\":\"surf@intuit.com\",\"balance\":500.2,\"currency\":\"USD\"}]}"
+          }
+        ],
+        "answer": "I couldn't find a customer named Bill Smith in QuickBooks, so I haven't created an invoice yet.\n\nThe closest matches are:\n- **Smith Co** (id 4)\n- **Smith Ltd** (id 5)\n- **Bill's Windsurf Shop** (id 2)\n\nWhich one should I invoice? If Bill Smith is a new customer, I'll need to know it's a new account, and it would have to be added in QuickBooks first.\n\nThe invoice would be:\n- **Item:** Design (Custom design, service), 2 hours at $75.00/hour\n- **Total:** $150.00 USD, not taxable\n\nThis is demo data (\"Porter Test Co\"), so the invoice would only last until the server restarts. Once you pick the customer and confirm, I'll generate the preview for your approval.",
+        "turns": 5,
+        "durationMs": 4747,
+        "usage": {
+          "inputTokens": 24900,
+          "outputTokens": 679
+        }
+      }
+    }
+  ]
+}
