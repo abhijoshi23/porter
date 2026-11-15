@@ -126,7 +126,7 @@ export type TokenCheck = 'ok' | 'expired' | 'mismatch' | 'malformed';
  * unique, so callers can derive an idempotency key from it.
  */
 export class ConfirmationTokens {
-  private readonly key: Buffer;
+  private keyBytes: Buffer | undefined;
 
   /**
    * `secret` should be set when several processes serve one client (HTTP behind a load
@@ -134,10 +134,18 @@ export class ConfirmationTokens {
    * process serves both calls.
    */
   constructor(
-    secret: string | undefined,
+    private readonly secret: string | undefined,
     private readonly opts: { ttlSeconds?: number; now?: () => number } = {},
-  ) {
-    this.key = secret ? createHash('sha256').update(secret).digest() : randomBytes(32);
+  ) {}
+
+  /**
+   * Made on first use, not in the constructor: Cloudflare Workers forbids random values at
+   * module load, and servers are often built there.
+   */
+  private get key(): Buffer {
+    return (this.keyBytes ??= this.secret
+      ? createHash('sha256').update(this.secret).digest()
+      : randomBytes(32));
   }
 
   private now(): number {

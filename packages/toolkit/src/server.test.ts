@@ -156,4 +156,51 @@ describe('runServer over real HTTP', () => {
     });
     await expect(runServer(def, config, silentLogger)).rejects.toBeInstanceOf(ConfigError);
   });
+
+  it('requires a bearer token on /mcp when OAuth is configured', async () => {
+    const config = loadConfig(baseConfigSchema, {
+      PORTER_TRANSPORT: 'http',
+      PORTER_HTTP_PORT: '0',
+      PORTER_OAUTH_ISSUER: 'https://auth.example.com',
+      PORTER_OAUTH_RESOURCE: 'http://localhost:3000/mcp',
+    });
+    running = await runServer(def, config, silentLogger);
+    const base = `http://127.0.0.1:${running.port}`;
+    const res = await fetch(`${base}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toContain(
+      'resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource/mcp"',
+    );
+    const meta = await fetch(`${base}/.well-known/oauth-protected-resource/mcp`);
+    expect(await meta.json()).toMatchObject({
+      resource: 'http://localhost:3000/mcp',
+      authorization_servers: ['https://auth.example.com'],
+    });
+  });
+
+  it.each([
+    [{ PORTER_OAUTH_ISSUER: 'https://auth.example.com' }, /together/],
+    [{ PORTER_OAUTH_RESOURCE: 'https://mcp.example.com/mcp' }, /together/],
+    [
+      {
+        PORTER_OAUTH_ISSUER: 'https://auth.example.com',
+        PORTER_OAUTH_RESOURCE: 'https://mcp.example.com/other',
+      },
+      /\/mcp URL/,
+    ],
+  ])('rejects incomplete OAuth settings %#', async (env, message) => {
+    const config = loadConfig(baseConfigSchema, {
+      PORTER_TRANSPORT: 'http',
+      PORTER_HTTP_PORT: '0',
+      ...env,
+    });
+    await expect(runServer(def, config, silentLogger)).rejects.toThrow(message);
+  });
 });

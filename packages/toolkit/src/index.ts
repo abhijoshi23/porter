@@ -4,6 +4,8 @@ export * from './confirm.js';
 export * from './define-tool.js';
 export * from './errors.js';
 export * from './http.js';
+export * from './http-handler.js';
+export * from './oauth.js';
 export * from './logger.js';
 export * from './pagination.js';
 export * from './rate-limit.js';

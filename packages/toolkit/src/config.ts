@@ -19,6 +19,25 @@ export const baseConfigSchema = z.object({
         .map((h) => h.trim())
         .filter(Boolean),
     ),
+  /**
+   * HTTP mode: require OAuth access tokens on `/mcp` (resource-server mode, ADR-005). Set
+   * the issuer and this server's public URL together; leave both empty for no auth.
+   */
+  PORTER_OAUTH_ISSUER: z.url().optional(),
+  /** This server's public MCP URL, e.g. https://mcp.example.com/mcp. Tokens must name it in `aud`. */
+  PORTER_OAUTH_RESOURCE: z.url().optional(),
+  /** Signing keys, if the issuer's metadata doesn't list `jwks_uri`. */
+  PORTER_OAUTH_JWKS_URL: z.url().optional(),
+  /** Comma-separated scopes every request needs. */
+  PORTER_OAUTH_SCOPES: z
+    .string()
+    .default('')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

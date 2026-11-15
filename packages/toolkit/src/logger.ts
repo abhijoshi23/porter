@@ -8,7 +8,12 @@ export type { Logger };
  * connection. MCP's own `notifications/message` logging is deprecated as of 2026-07-28,
  * so stderr (plus OpenTelemetry in HTTP mode) is the supported path.
  */
-export function createLogger(name: string, level = 'info'): Logger {
+export function createLogger(
+  name: string,
+  level = 'info',
+  /** Where JSON lines go instead of stderr, e.g. `console.log` on Cloudflare Workers (no fds there). */
+  write?: (line: string) => void,
+): Logger {
   return pino(
     {
       name,
@@ -32,7 +37,7 @@ export function createLogger(name: string, level = 'info'): Logger {
         censor: '[redacted]',
       },
     },
-    pino.destination(2),
+    write ? { write: (line: string) => write(line.trimEnd()) } : pino.destination(2),
   );
 }
 
