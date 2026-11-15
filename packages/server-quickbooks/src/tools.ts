@@ -829,10 +829,10 @@ const createInvoice = (d: ToolDeps) =>
       } else {
         if (d.requireElicitation) {
           throw new PorterError(
-            'Nothing was created: this client cannot ask the user to approve the invoice, and the server requires that (QUICKBOOKS_REQUIRE_ELICITATION, on by default).',
+            'Nothing was created: this connection cannot ask the user to approve the invoice (the client lacks elicitation, or it is a 2025-era client over stateless HTTP), and the server requires that (QUICKBOOKS_REQUIRE_ELICITATION, on by default).',
             {
               hint:
-                'Tell the user to create it in QuickBooks directly, use a client that supports elicitation, or set QUICKBOOKS_REQUIRE_ELICITATION=false ' +
+                'Tell the user to create it in QuickBooks directly, connect over stdio or with a 2026-07-28 client that supports elicitation, or set QUICKBOOKS_REQUIRE_ELICITATION=false ' +
                 "to allow preview-and-confirm instead. Don't retry.",
             },
           );

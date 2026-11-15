@@ -45,6 +45,11 @@ export interface QuickBooksOptions {
   fetch?: FetchFn;
   /** Injected in tests to pin "now". */
   now?: () => number;
+  /**
+   * Share one signer across definitions built per request (the hosted demo), so an approval
+   * minted on one request verifies on the next. Default: one per definition.
+   */
+  tokens?: ConfirmationTokens;
 }
 
 export function oauthApp(config: QuickBooksConfig): OAuthApp | undefined {
@@ -99,7 +104,7 @@ export function createQuickBooksServer(o: QuickBooksOptions): ServerDefinition {
   }
   const qbo = new QboClient({ ...parts, log: o.log, environment: env, now });
   const books = new Books(qbo, now);
-  const tokens = new ConfirmationTokens(o.config.PORTER_CONFIRM_SECRET, { now });
+  const tokens = o.tokens ?? new ConfirmationTokens(o.config.PORTER_CONFIRM_SECRET, { now });
 
   return {
     name: NAME,

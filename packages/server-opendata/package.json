@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/server.d.ts",
       "default": "./dist/server.js"
+    },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "default": "./dist/remote.js"
     }
   },
   "files": [

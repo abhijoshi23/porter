@@ -344,7 +344,7 @@ describe.each(ERAS)('porter-quickbooks over the %s protocol', (era) => {
     it('refuses clients that cannot ask the user by default, and says how to opt in', async () => {
       const r = await call('create_invoice', args);
       expect(r.isError).toBe(true);
-      expect(text(r)).toMatch(/Nothing was created: this client cannot ask the user/);
+      expect(text(r)).toMatch(/Nothing was created: this connection cannot ask the user/);
       expect(text(r)).toContain('QUICKBOOKS_REQUIRE_ELICITATION=false');
       expect(text(r)).not.toContain('confirmationToken"');
       expect(state.calls.create).toBe(0);

@@ -11,7 +11,8 @@ import * as z from 'zod/v4';
 import { CkanClient, PORTAL_IDS } from './ckan.js';
 import type { OpendataConfig } from './config.js';
 import { StatCanClient } from './statcan.js';
-import { allTools, type Deps } from './tools.js';
+import { allTools } from './sql-tools.js';
+import type { Deps } from './tools.js';
 
 export { configSchema } from './config.js';
 export const NAME = 'porter-opendata';

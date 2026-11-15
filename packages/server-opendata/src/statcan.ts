@@ -294,12 +294,14 @@ export class StatCanClient {
 
   constructor(
     private readonly http: HttpClient,
-    private readonly downloads: DownloadCache,
+    /** Needed only for the table list (findTables). The remote build has no disk and omits it. */
+    private readonly downloads?: DownloadCache,
   ) {}
 
   /** The full table list (~8,000 tables, ~5 MB) is cached on disk for a day and searched locally. */
   private async cubeList(): Promise<CubeLite[]> {
     if (this.cubes && Date.now() - this.cubes.at < DAY) return this.cubes.list;
+    if (!this.downloads) throw new PorterError('Table search is not available in this deployment.');
     const file = await this.downloads.get(`${WDS}/getAllCubesListLite`, {
       ttlMs: DAY,
       maxBytes: 50 * 1_048_576,
