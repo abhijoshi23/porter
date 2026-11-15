@@ -2,7 +2,7 @@
 
 **MCP servers that give AI assistants safe, well-designed access to Canadian public data, Ontario transit, federal tenders and small-business accounting.**
 
-> 🚧 Early development. The toolkit, the open-data, transit, tenders and QuickBooks servers, and the eval runner are done. See the [roadmap](#roadmap).
+> 🚧 Early development. The toolkit, the open-data, transit, tenders and QuickBooks servers, the eval runner and the hosted demo are done. See the [roadmap](#roadmap).
 
 Porter is a monorepo of [Model Context Protocol](https://modelcontextprotocol.io) servers built on a shared toolkit. It targets the **2026-07-28** MCP spec with the v2 TypeScript SDK, and it still serves 2025-era clients such as Claude Desktop.
 
@@ -12,15 +12,16 @@ Most existing servers wrap APIs one endpoint at a time; one Canadian-data server
 
 ## Packages
 
-| Package                                           | Status       | What it does                                                                                                      |
-| ------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [`@abhijoshi23/porter-toolkit`](packages/toolkit) | ✅           | Server factory (stdio and Streamable HTTP), `defineTool`, resilient HTTP, pagination and truncation, test harness |
-| [`porter-hello`](packages/server-hello)           | ✅ (example) | Reference server showing the patterns                                                                             |
-| [`porter-opendata`](packages/server-opendata)     | ✅           | Ontario, Toronto and federal CKAN plus StatCan                                                                    |
-| [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                           |
-| [`porter-evals`](packages/evals)                  | ✅ (private) | Eval runner: Claude Code headless or Ollama drivers, deterministic checks, Markdown reports                       |
-| [`porter-tenders`](packages/server-tenders)       | ✅           | CanadaBuys tender search, notice details and bid-fit summaries                                                    |
-| [`porter-quickbooks`](packages/server-quickbooks) | ✅           | QuickBooks Online: receivables, P&L, invoices; writes only after the user approves (demo company built in)        |
+| Package                                           | Status       | What it does                                                                                                                 |
+| ------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| [`@abhijoshi23/porter-toolkit`](packages/toolkit) | ✅           | Server factory (stdio and Streamable HTTP), `defineTool`, resilient HTTP, pagination and truncation, test harness            |
+| [`porter-hello`](packages/server-hello)           | ✅ (example) | Reference server showing the patterns                                                                                        |
+| [`porter-opendata`](packages/server-opendata)     | ✅           | Ontario, Toronto and federal CKAN plus StatCan                                                                               |
+| [`porter-transit`](packages/server-transit)       | ✅           | GTFS for GRT, HSR, TTC and GO, with realtime where open                                                                      |
+| [`porter-evals`](packages/evals)                  | ✅ (private) | Eval runner: Claude Code headless or Ollama drivers, deterministic checks, Markdown reports                                  |
+| [`porter-tenders`](packages/server-tenders)       | ✅           | CanadaBuys tender search, notice details and bid-fit summaries                                                               |
+| [`porter-quickbooks`](packages/server-quickbooks) | ✅           | QuickBooks Online: receivables, P&L, invoices; writes only after the user approves (demo company built in)                   |
+| [`porter-demo`](apps/demo)                        | ✅ (private) | Hosted demo on Cloudflare Workers: QuickBooks sample company and open-data search, optional OAuth ([deploy](docs/deploy.md)) |
 
 ## Evals
 
@@ -57,7 +58,7 @@ The first run exposed two real bugs and five tool-design gaps; [tool-design.md](
 - **Safe by default**: tools are read-only unless they opt out, and writes need the user's approval (elicitation in both protocol eras, or a signed preview token: `askUser`, `ConfirmationTokens`). Errors become model-readable `isError` results with hints, and internals never leak.
 - **Context-friendly**: opaque cursors, plus hard row and byte caps with "refine your query" hints.
 - **Resilient upstream calls**: per-host token-bucket rate limiting, timeouts, jittered retries that honour `Retry-After`.
-- **DNS-rebinding protection** in HTTP mode (`Host`/`Origin` validation).
+- **One HTTP handler for Node and Cloudflare Workers** (`createMcpFetchHandler`): `Host`/`Origin` validation, per-client rate limiting, and **OAuth 2.1 resource-server mode** (RFC 9728 metadata, audience-bound JWTs; `jwtVerifier`).
 - **stdout is sacred**: logs go to stderr only, and lint forbids `console.log`.
 
 Security details (SQL sandbox, prompt injection, download limits): [docs/security.md](docs/security.md).
@@ -94,8 +95,9 @@ claude mcp add --transport stdio porter-hello -- node "$PWD/packages/server-hell
 4. ✅ Eval runner ([docs/evals.md](docs/evals.md))
 5. ✅ Tenders server
 6. ✅ QuickBooks server ([ADR-004](docs/adr/004-write-confirmation.md): confirming writes)
-7. Keel/Trillium adapters + remote deployment
+7. ✅ Remote deployment: Cloudflare Workers demo, OAuth resource-server mode ([ADR-005](docs/adr/005-remote-hosting.md), [deploy guide](docs/deploy.md))
 8. Publish to npm, the MCP Registry and `.mcpb` bundles
+9. Stretch: Keel/Trillium adapters
 
 ## License
 

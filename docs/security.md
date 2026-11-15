@@ -81,7 +81,15 @@ That test found a toolkit bug: `externalText()` turned newlines into spaces befo
 ## HTTP mode
 
 - **DNS-rebinding protection:** `Host` and `Origin` are validated before the MCP handler. Loopback binds accept only localhost names, and public binds require `PORTER_ALLOWED_HOSTS`.
-- **OAuth 2.1 resource-server mode:** Milestone 7.
+- **Same handler everywhere:** Node HTTP mode and the Cloudflare Worker serve through one fetch handler (`createMcpFetchHandler`), so the checks below can't drift apart between runtimes.
+- **OAuth 2.1 resource-server mode** (ADR-005): set `PORTER_OAUTH_ISSUER` and `PORTER_OAUTH_RESOURCE`. Porter never issues tokens; it verifies them.
+  - **Signature:** checked against the issuer's published keys. The discovery document must name the same issuer, and only asymmetric algorithms are accepted, so `alg: none` and HS256-with-a-public-key confusion are refused.
+  - **Claims:** `iss` must match, `aud` must be this server's URL (RFC 8707, so tokens minted for another service can't be replayed here), and `exp`/`nbf` must hold.
+  - **Responses:** a missing or bad token gets 401 with a `WWW-Authenticate` challenge pointing at the RFC 9728 metadata. A missing scope gets 403 `insufficient_scope`.
+  - **Error text:** it says which check failed and never echoes token contents. Pino redacts `authorization` and `token` fields in logs.
+- **Rate limit** (hosted demo): a fixed window per client IP, in memory. It is best effort per isolate, with Cloudflare's own protection in front.
+- **Hosted demo data:** a fresh sample company for every request, so nothing one visitor writes reaches another. Writes still need the user's approval (ADR-004), and 2025-era clients over stateless HTTP are refused because they can't be asked.
+- **Landing page:** static HTML with `Content-Security-Policy: default-src 'none'`, and the request origin is HTML-escaped before it's shown.
 
 ## Supply chain
 
