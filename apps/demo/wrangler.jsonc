@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Porter's hosted demo. Deploy: see docs/deploy.md.
+  "name": "porter-demo",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-29",
+  // node:crypto and friends, used by the toolkit (HMAC for write approvals).
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": {
+    // Set to your workers.dev hostname before deploying, e.g. "porter-demo.you.workers.dev".
+    "ALLOWED_HOSTS": "",
+    // Your https origin; needed only for the OAuth route.
+    "PUBLIC_URL": "",
+    "RATE_LIMIT_PER_MINUTE": "60",
+    "LOG_LEVEL": "info",
+    // PORTER_OAUTH_ISSUER / PORTER_OAUTH_JWKS_URL: set to enable /quickbooks/mcp-auth.
+    // PORTER_CONFIRM_SECRET: a secret, not a var (wrangler secret put PORTER_CONFIRM_SECRET).
+  },
+}

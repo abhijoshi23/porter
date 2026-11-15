@@ -1,0 +1,25 @@
+{
+  "name": "@abhijoshi23/porter-demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hosted Porter demo on Cloudflare Workers: the QuickBooks sample company and open-data search, over Streamable HTTP.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@abhijoshi23/porter-opendata": "workspace:*",
+    "@abhijoshi23/porter-quickbooks": "workspace:*",
+    "@abhijoshi23/porter-toolkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "jose": "6.2.14",
+    "wrangler": "4.156.0"
+  }
+}

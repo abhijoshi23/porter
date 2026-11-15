@@ -1,4 +1,9 @@
 packages:
   - packages/*
+  - apps/*
+# Install scripts are blocked by default. These two download their platform binary (wrangler needs both).
+allowBuilds:
+  esbuild: true
+  workerd: true
 minimumReleaseAgeExclude:
   - eslint@10.14.0
