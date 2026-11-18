@@ -1,6 +1,6 @@
 {
   "name": "@abhijoshi23/porter-tenders",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for Canadian federal tenders (CanadaBuys): search open and recent notices, read one, and pull out what decides whether to bid.",
   "license": "MIT",
   "type": "module",

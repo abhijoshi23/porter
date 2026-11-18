@@ -1,6 +1,6 @@
 {
   "name": "@abhijoshi23/porter-quickbooks",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for QuickBooks Online, shaped as an owner's assistant: who owes me, profit and loss, and invoices created only after the user confirms.",
   "license": "MIT",
   "type": "module",

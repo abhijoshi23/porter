@@ -1,6 +1,6 @@
 {
   "name": "@abhijoshi23/porter-transit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for Ontario transit: GTFS schedules and realtime for Grand River Transit, Hamilton Street Railway, TTC and GO Transit.",
   "license": "MIT",
   "type": "module",

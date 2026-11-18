@@ -1,6 +1,6 @@
 {
   "name": "@abhijoshi23/porter-opendata",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for Canadian open data: Ontario, Toronto and federal CKAN catalogues plus Statistics Canada, with sandboxed SQL over CSVs.",
   "license": "MIT",
   "type": "module",

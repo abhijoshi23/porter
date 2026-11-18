@@ -1,6 +1,6 @@
 {
   "name": "@abhijoshi23/porter-toolkit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared building blocks for Porter MCP servers: server factory, tool helper, resilient HTTP, caching, pagination, testing utilities.",
   "license": "MIT",
   "type": "module",
