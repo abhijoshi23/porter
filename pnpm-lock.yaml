@@ -216,8 +216,8 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
       jose:
-        specifier: 6.2.14
-        version: 6.2.14
+        specifier: 6.2.18
+        version: 6.2.18
       wrangler:
         specifier: 4.156.0
         version: 4.156.0(@types/node@22.20.5)
@@ -338,8 +338,8 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
       jose:
-        specifier: 6.2.14
-        version: 6.2.14
+        specifier: 6.2.18
+        version: 6.2.18
       lru-cache:
         specifier: 11.5.3
         version: 11.5.3
@@ -1460,8 +1460,8 @@ packages:
   jju@1.4.0:
     resolution: {integrity: sha512-8wb9Yw966OSxApiCt0K3yNJL8pnNeIv+OEq2YMidz4FKP6nonSRoOXc80iXY4JaN2FC11B9qsNmDsm+ZOfMROA==}
 
-  jose@6.2.14:
-    resolution: {integrity: sha512-3JasLuki1NRLQvY4wCoC37KZk4qxoBx2k2aFqLxT84IezqW0bkJKnNtxnZj/Fu1xsQivoc/lytxaRHJoGLjJ1A==}
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
 
   json-schema-traverse@0.4.1:
     resolution: {integrity: sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==}
@@ -2428,7 +2428,7 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      jose: 6.2.14
+      jose: 6.2.18
       pkce-challenge: 5.0.1
       zod: 4.6.7
 
@@ -2899,7 +2899,7 @@ snapshots:
 
   jju@1.4.0: {}
 
-  jose@6.2.14: {}
+  jose@6.2.18: {}
 
   json-schema-traverse@0.4.1: {}
 
